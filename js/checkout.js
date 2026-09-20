@@ -1,7 +1,7 @@
-var EMAILJS_PUBLIC_KEY = "3ti2fYTvCCe8bkNor";
-var EMAILJS_SERVICE_ID = "service_fyhhn57";
-var EMAILJS_TEMPLATE_ID = "template_0aa5n4b";
-var STORE_EMAIL = "ammarwaheed898@gmail.com";
+var EMAILJS_PUBLIC_KEY = "JJp5Iruhyn8-EVRb2";
+var EMAILJS_SERVICE_ID = "service_sj761t8";
+var EMAILJS_TEMPLATE_ID = "template_clvct8d";
+var STORE_EMAIL = "laptop-valley@outlook.com";
 
 try {
   if (typeof emailjs !== 'undefined') {
