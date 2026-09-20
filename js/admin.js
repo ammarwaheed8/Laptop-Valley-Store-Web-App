@@ -1,13 +1,107 @@
 var ADMIN_USERNAME = "laptop-valley@outlook.com";
 var ADMIN_PASSWORD = "Hasan@Admin2529";
 
+// ---- AUTO LOGOUT / IDLE TIMEOUT SETTINGS ----
+var IDLE_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
+var IDLE_CHECK_INTERVAL_MS = 10 * 1000; // check every 10 seconds
+var idleCheckTimer = null;
+var lastActivityWriteTime = 0;
+
 function showToast(msg, isError) {
   var toast = document.getElementById('toast');
   if (!toast) return;
   toast.textContent = msg;
   toast.className = 'toast' + (isError ? ' error' : '');
   toast.style.display = 'block';
-  setTimeout(function() { toast.style.display = 'none'; }, 2500);
+  setTimeout(function() { toast.style.display = 'none'; }, 3000);
+}
+
+function isAdminLoggedIn() {
+  return sessionStorage.getItem('lv_admin_logged') === 'true';
+}
+
+function updateLastActivity() {
+  if (!isAdminLoggedIn()) return;
+  var now = Date.now();
+  // Throttle writes to sessionStorage - only write once every 2 seconds max
+  if (now - lastActivityWriteTime > 2000) {
+    sessionStorage.setItem('lv_admin_last_activity', now.toString());
+    lastActivityWriteTime = now;
+  }
+}
+
+function checkIdleTimeout() {
+  if (!isAdminLoggedIn()) return;
+
+  var last = parseInt(sessionStorage.getItem('lv_admin_last_activity') || '0', 10);
+  if (!last) {
+    // Safety fallback - if no timestamp exists yet, set it now
+    sessionStorage.setItem('lv_admin_last_activity', Date.now().toString());
+    return;
+  }
+
+  var now = Date.now();
+  var elapsed = now - last;
+
+  if (elapsed >= IDLE_TIMEOUT_MS) {
+    autoLogoutDueToInactivity();
+  }
+}
+
+function autoLogoutDueToInactivity() {
+  sessionStorage.removeItem('lv_admin_logged');
+  sessionStorage.removeItem('lv_admin_last_activity');
+
+  if (idleCheckTimer) {
+    clearInterval(idleCheckTimer);
+    idleCheckTimer = null;
+  }
+
+  var dashboard = document.getElementById('adminDashboard');
+  var loginScreen = document.getElementById('loginScreen');
+  if (dashboard) dashboard.style.display = 'none';
+  if (loginScreen) loginScreen.style.display = 'block';
+
+  var loginError = document.getElementById('loginError');
+  if (loginError) loginError.style.display = 'none';
+
+  showToast('Session expired due to inactivity. Please login again.', true);
+}
+
+function startIdleWatcher() {
+  // Set initial activity timestamp
+  sessionStorage.setItem('lv_admin_last_activity', Date.now().toString());
+  lastActivityWriteTime = Date.now();
+
+  // Activity events that reset the idle timer
+  var activityEvents = ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart', 'click'];
+  for (var i = 0; i < activityEvents.length; i++) {
+    document.addEventListener(activityEvents[i], updateLastActivity, true);
+  }
+
+  // Periodic check for idle timeout
+  if (idleCheckTimer) clearInterval(idleCheckTimer);
+  idleCheckTimer = setInterval(checkIdleTimeout, IDLE_CHECK_INTERVAL_MS);
+
+  // Also check immediately when tab becomes visible again
+  // (covers case where admin switched to another tab / browsed the store for a long time)
+  document.addEventListener('visibilitychange', function() {
+    if (document.visibilityState === 'visible') {
+      checkIdleTimeout();
+    }
+  });
+
+  // Also check on window focus (extra safety net across browsers)
+  window.addEventListener('focus', function() {
+    checkIdleTimeout();
+  });
+}
+
+function stopIdleWatcher() {
+  if (idleCheckTimer) {
+    clearInterval(idleCheckTimer);
+    idleCheckTimer = null;
+  }
 }
 
 function doLogin() {
@@ -20,10 +114,12 @@ function doLogin() {
 
   if (user === ADMIN_USERNAME && pass === ADMIN_PASSWORD) {
     sessionStorage.setItem('lv_admin_logged', 'true');
+    sessionStorage.setItem('lv_admin_last_activity', Date.now().toString());
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('adminDashboard').style.display = 'block';
     if (errorEl) errorEl.style.display = 'none';
     initAdminDashboard();
+    startIdleWatcher();
   } else {
     if (errorEl) errorEl.style.display = 'block';
     showToast('Invalid credentials', true);
@@ -32,6 +128,8 @@ function doLogin() {
 
 function doLogout() {
   sessionStorage.removeItem('lv_admin_logged');
+  sessionStorage.removeItem('lv_admin_last_activity');
+  stopIdleWatcher();
   location.reload();
 }
 
@@ -195,7 +293,6 @@ function renderLaptopTable() {
   tbody.innerHTML = html;
 }
 
-// ---- HELPER: Get badge color class for each status ----
 function getStatusClass(status) {
   if (status === 'confirmed') return 'badge-confirmed';
   if (status === 'declined') return 'badge-declined';
@@ -250,7 +347,6 @@ function renderOrdersTable() {
   tbody.innerHTML = html;
 }
 
-// ---- CHANGE ORDER STATUS (with stock reversal for refund/declined) ----
 function changeOrderStatus(orderId, newStatus) {
   var validStatuses = ['pending', 'confirmed', 'declined', 'refund'];
   if (validStatuses.indexOf(newStatus) === -1) return;
@@ -266,14 +362,10 @@ function changeOrderStatus(orderId, newStatus) {
     }
   }
 
-  // If order was previously active (pending/confirmed) and is now being refunded or declined,
-  // restore the stock back to inventory
   var shouldRestoreStock =
     (oldStatus === 'pending' || oldStatus === 'confirmed') &&
     (newStatus === 'refund' || newStatus === 'declined');
 
-  // If order was previously refund/declined and is being moved back to active (pending/confirmed),
-  // deduct stock again
   var shouldDeductStock =
     (oldStatus === 'refund' || oldStatus === 'declined') &&
     (newStatus === 'pending' || newStatus === 'confirmed');
@@ -334,7 +426,6 @@ function printInvoice(orderId) {
 
   var currentStatus = order.status || 'pending';
 
-  // Map status to color scheme for invoice
   var statusColor = '#fef3c7';
   var statusTextColor = '#92400e';
   var statusLabel = 'Pending';
@@ -441,7 +532,6 @@ function updateStats() {
   var revenue = 0;
   for (var i = 0; i < orders.length; i++) {
     if (orders[i].status === 'pending') pending++;
-    // Only count revenue from active orders (not declined or refunded)
     if (orders[i].status !== 'declined' && orders[i].status !== 'refund') {
       revenue += orders[i].total;
     }
@@ -503,9 +593,24 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
 
-  if (sessionStorage.getItem('lv_admin_logged') === 'true') {
-    document.getElementById('loginScreen').style.display = 'none';
-    document.getElementById('adminDashboard').style.display = 'block';
-    initAdminDashboard();
+  // Check if already logged in (e.g., page refresh)
+  if (isAdminLoggedIn()) {
+    // Verify session hasn't already expired while page was reloading
+    var lastActivity = parseInt(sessionStorage.getItem('lv_admin_last_activity') || '0', 10);
+    var now = Date.now();
+
+    if (lastActivity && (now - lastActivity) >= IDLE_TIMEOUT_MS) {
+      // Session already expired, force logout view
+      sessionStorage.removeItem('lv_admin_logged');
+      sessionStorage.removeItem('lv_admin_last_activity');
+      document.getElementById('loginScreen').style.display = 'block';
+      document.getElementById('adminDashboard').style.display = 'none';
+      showToast('Session expired due to inactivity. Please login again.', true);
+    } else {
+      document.getElementById('loginScreen').style.display = 'none';
+      document.getElementById('adminDashboard').style.display = 'block';
+      initAdminDashboard();
+      startIdleWatcher();
+    }
   }
 });
