@@ -395,6 +395,33 @@ footer p { opacity:0.8; font-size:0.9rem; margin-top:15px; }
   outline:none;
   font-family:inherit;
 }
+
+.password-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.password-wrapper input {
+  width: 100%;
+  padding-right: 45px;
+}
+
+.toggle-eye {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  cursor: pointer;
+  color: var(--gray);
+  display: flex;
+  align-items: center;
+  user-select: none;
+}
+
+.toggle-eye:hover {
+  color: var(--secondary-blue);
+}
+
 .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
   border-color: var(--secondary-blue);
 }
