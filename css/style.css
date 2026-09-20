@@ -539,7 +539,50 @@ footer p { opacity:0.8; font-size:0.9rem; margin-top:15px; }
 .badge { padding:3px 10px; border-radius:12px; font-size:0.75rem; font-weight:600; }
 .badge-pending { background:#fef3c7; color:#92400e; }
 .badge-confirmed { background:#dcfce7; color:#166534; }
+.badge-declined { background:#fee2e2; color:#991b1b; }
+.badge-refund { background:#fef3c7; color:#92400e; }
 
+/* Status dropdown styling */
+.status-dropdown {
+  padding: 6px 10px;
+  border: 2px solid var(--light-blue);
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  background: white;
+  cursor: pointer;
+  outline: none;
+  font-family: inherit;
+  min-width: 110px;
+}
+
+.status-dropdown:focus {
+  border-color: var(--secondary-blue);
+}
+
+.status-dropdown[data-current="confirmed"] {
+  background: #dcfce7;
+  color: #166534;
+  border-color: #86efac;
+}
+
+.status-dropdown[data-current="declined"] {
+  background: #fee2e2;
+  color: #991b1b;
+  border-color: #fca5a5;
+}
+
+.status-dropdown[data-current="refund"] {
+  background: #fef3c7;
+  color: #92400e;
+  border-color: #fde68a;
+}
+
+.status-dropdown[data-current="pending"] {
+  background: #fef3c7;
+  color: #92400e;
+  border-color: #fde68a;
+}
 .error-text { color: var(--danger); font-size: 0.85rem; margin-top: 10px; text-align:center; }
 
 .toast {
