@@ -1,165 +1,85 @@
-var DEFAULT_LAPTOPS = [
-  {
-    id: "lp001",
-    brand: "Dell",
-    model: "XPS 15 9530",
-    processorBrand: "Intel",
-    processorModel: "Core i7-13700H",
-    ramSize: "16GB",
-    ramType: "DDR5",
-    storageType: "SSD",
-    storageCapacity: "512GB",
-    displaySize: "15.6 inch",
-    displayResolution: "FHD+ 1920x1200",
-    displayType: "IPS",
-    graphics: "NVIDIA RTX 4050 6GB",
-    os: "Windows 11 Home",
-    battery: "86Wh, up to 13 hrs",
-    weight: "1.86 kg",
-    color: "Platinum Silver",
-    warranty: "1 Year",
-    price: 425000,
-    stock: 8,
-    image: "https://images.unsplash.com/photo-1593642702821-c8da6771f0c6?w=500",
-    description: "Premium build with stunning display, powerful performance for creators and professionals."
+// Global memory cache of laptops retrieved from server
+var CACHED_LAPTOPS = [];
+
+// ---- API CLIENT (Database on hosting drive) ----
+var DB = {
+  fetchLaptops: function() {
+    return fetch('api.php?action=get_laptops')
+      .then(function(res) { return res.json(); })
+      .then(function(data) {
+        if (data.success) {
+          CACHED_LAPTOPS = data.laptops;
+          return data.laptops;
+        }
+        return [];
+      });
   },
-  {
-    id: "lp002",
-    brand: "Apple",
-    model: "MacBook Air M2",
-    processorBrand: "Apple",
-    processorModel: "Apple M2 8-core",
-    ramSize: "8GB",
-    ramType: "Unified Memory",
-    storageType: "SSD",
-    storageCapacity: "256GB",
-    displaySize: "13.6 inch",
-    displayResolution: "Retina 2560x1664",
-    displayType: "IPS",
-    graphics: "Apple 8-core GPU Integrated",
-    os: "macOS",
-    battery: "Up to 18 hrs",
-    weight: "1.24 kg",
-    color: "Midnight",
-    warranty: "1 Year",
-    price: 335000,
-    stock: 12,
-    image: "https://images.unsplash.com/photo-1611186871348-b1ce696e52c9?w=500",
-    description: "Incredibly thin and light, powered by the efficient M2 chip with all day battery life."
+
+  saveLaptop: function(laptopData) {
+    return fetch('api.php?action=save_laptop', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(laptopData)
+    }).then(function(res) { return res.json(); });
   },
-  {
-    id: "lp003",
-    brand: "ASUS",
-    model: "ROG Strix G16",
-    processorBrand: "Intel",
-    processorModel: "Core i9-13980HX",
-    ramSize: "32GB",
-    ramType: "DDR5",
-    storageType: "SSD",
-    storageCapacity: "1TB",
-    displaySize: "16 inch",
-    displayResolution: "QHD+ 240Hz",
-    displayType: "IPS",
-    graphics: "NVIDIA RTX 4070 8GB",
-    os: "Windows 11 Home",
-    battery: "90Wh",
-    weight: "2.5 kg",
-    color: "Eclipse Gray",
-    warranty: "2 Years",
-    price: 585000,
-    stock: 5,
-    image: "https://images.unsplash.com/photo-1603302576837-37561b2e2302?w=500",
-    description: "Ultimate gaming powerhouse with high refresh rate display and top tier cooling."
+
+  deleteLaptop: function(id) {
+    return fetch('api.php?action=delete_laptop', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: id })
+    }).then(function(res) { return res.json(); });
   },
-  {
-    id: "lp004",
-    brand: "HP",
-    model: "Pavilion 15",
-    processorBrand: "AMD",
-    processorModel: "Ryzen 5 7530U",
-    ramSize: "8GB",
-    ramType: "DDR4",
-    storageType: "SSD",
-    storageCapacity: "512GB",
-    displaySize: "15.6 inch",
-    displayResolution: "FHD 1920x1080",
-    displayType: "IPS",
-    graphics: "AMD Radeon Graphics Integrated",
-    os: "Windows 11 Home",
-    battery: "41Wh, up to 8 hrs",
-    weight: "1.75 kg",
-    color: "Natural Silver",
-    warranty: "1 Year",
-    price: 165000,
-    stock: 15,
-    image: "https://images.unsplash.com/photo-1588872657578-7efd1f1555ed?w=500",
-    description: "Reliable everyday laptop perfect for students and home office use."
+
+  createOrder: function(orderData) {
+    return fetch('api.php?action=create_order', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(orderData)
+    }).then(function(res) { return res.json(); });
+  },
+
+  fetchOrders: function() {
+    return fetch('api.php?action=get_orders')
+      .then(function(res) { return res.json(); })
+      .then(function(data) { return data.success ? data.orders : []; });
+  },
+
+  updateOrderStatus: function(orderId, status) {
+    return fetch('api.php?action=update_order_status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: orderId, status: status })
+    }).then(function(res) { return res.json(); });
+  },
+
+  deleteOrder: function(orderId) {
+    return fetch('api.php?action=delete_order', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: orderId })
+    }).then(function(res) { return res.json(); });
   }
-];
+};
 
 function getLaptops() {
-  var data = localStorage.getItem('lv_laptops');
-  if (!data) {
-    localStorage.setItem('lv_laptops', JSON.stringify(DEFAULT_LAPTOPS));
-    return DEFAULT_LAPTOPS.slice();
-  }
-  try {
-    var parsed = JSON.parse(data);
-    if (!Array.isArray(parsed)) throw new Error('Invalid data');
-    return parsed;
-  } catch (e) {
-    localStorage.setItem('lv_laptops', JSON.stringify(DEFAULT_LAPTOPS));
-    return DEFAULT_LAPTOPS.slice();
-  }
-}
-
-function saveLaptops(laptops) {
-  localStorage.setItem('lv_laptops', JSON.stringify(laptops));
-}
-
-function addLaptop(laptop) {
-  var laptops = getLaptops();
-  laptop.id = 'lp' + Date.now();
-  laptops.push(laptop);
-  saveLaptops(laptops);
-  return laptop;
-}
-
-function updateLaptop(id, updated) {
-  var laptops = getLaptops();
-  for (var i = 0; i < laptops.length; i++) {
-    if (laptops[i].id === id) {
-      updated.id = id;
-      laptops[i] = updated;
-    }
-  }
-  saveLaptops(laptops);
-}
-
-function deleteLaptop(id) {
-  var laptops = getLaptops();
-  var filtered = [];
-  for (var i = 0; i < laptops.length; i++) {
-    if (laptops[i].id !== id) filtered.push(laptops[i]);
-  }
-  saveLaptops(filtered);
+  return CACHED_LAPTOPS;
 }
 
 function getLaptopById(id) {
-  var laptops = getLaptops();
-  for (var i = 0; i < laptops.length; i++) {
-    if (laptops[i].id === id) return laptops[i];
+  for (var i = 0; i < CACHED_LAPTOPS.length; i++) {
+    if (CACHED_LAPTOPS[i].id === id) return CACHED_LAPTOPS[i];
   }
   return null;
 }
 
+// ---- SHOPPING CART (Client device storage) ----
 function getCart() {
   var cart = localStorage.getItem('lv_cart');
   if (!cart) return [];
   try {
     var parsed = JSON.parse(cart);
-    if (!Array.isArray(parsed)) return [];
-    return parsed;
+    return Array.isArray(parsed) ? parsed : [];
   } catch (e) {
     return [];
   }
@@ -210,34 +130,21 @@ function clearCart() {
   localStorage.removeItem('lv_cart');
 }
 
-// ---- SELF-HEALING CART VALIDATION ----
-// Runs automatically on every page load to fix any corrupted/stale cart data.
-// - Removes cart items for laptops that no longer exist
-// - Caps quantity to available stock (in case stock was reduced/laptop edited)
-// - Removes duplicate entries for same laptop id
-// - Removes zero or negative quantities
 function validateCart() {
   var cart = getCart();
-  var laptops = getLaptops();
-  var mergedMap = {};
+  var laptops = CACHED_LAPTOPS;
+  if (!laptops || laptops.length === 0) return cart;
 
+  var mergedMap = {};
   for (var i = 0; i < cart.length; i++) {
     var item = cart[i];
-    if (!item || !item.id || typeof item.qty !== 'number' || item.qty <= 0) continue;
+    if (!item || !item.id || item.qty <= 0) continue;
 
-    var lp = null;
-    for (var j = 0; j < laptops.length; j++) {
-      if (laptops[j].id === item.id) lp = laptops[j];
-    }
+    var lp = getLaptopById(item.id);
+    if (!lp) continue;
 
-    if (!lp) continue; // laptop deleted, skip
-
-    var qty = item.qty;
-    if (mergedMap[item.id]) {
-      qty = mergedMap[item.id] + item.qty; // merge duplicate entries
-    }
-
-    if (qty > lp.stock) qty = lp.stock; // cap to available stock
+    var qty = (mergedMap[item.id] || 0) + item.qty;
+    if (qty > lp.stock) qty = lp.stock;
     if (qty > 0) mergedMap[item.id] = qty;
   }
 
@@ -247,7 +154,6 @@ function validateCart() {
       cleanCart.push({ id: key, qty: mergedMap[key] });
     }
   }
-
   saveCart(cleanCart);
   return cleanCart;
 }
@@ -266,14 +172,10 @@ function getAvailableStock(laptopId) {
 
 function getCartTotal() {
   var cart = getCart();
-  var laptops = getLaptops();
   var total = 0;
   for (var i = 0; i < cart.length; i++) {
-    for (var j = 0; j < laptops.length; j++) {
-      if (laptops[j].id === cart[i].id) {
-        total += laptops[j].price * cart[i].qty;
-      }
-    }
+    var lp = getLaptopById(cart[i].id);
+    if (lp) total += lp.price * cart[i].qty;
   }
   return total;
 }
@@ -283,40 +185,6 @@ function getCartCount() {
   var count = 0;
   for (var i = 0; i < cart.length; i++) count += cart[i].qty;
   return count;
-}
-
-function getOrders() {
-  var orders = localStorage.getItem('lv_orders');
-  if (!orders) return [];
-  try {
-    var parsed = JSON.parse(orders);
-    if (!Array.isArray(parsed)) return [];
-    return parsed;
-  } catch (e) {
-    return [];
-  }
-}
-
-function saveOrders(orders) {
-  localStorage.setItem('lv_orders', JSON.stringify(orders));
-}
-
-function addOrder(order) {
-  var orders = getOrders();
-  order.id = 'ORD' + Date.now();
-  order.date = new Date().toISOString();
-  order.status = 'pending';
-  orders.unshift(order);
-  saveOrders(orders);
-  return order;
-}
-
-function updateOrderStatus(orderId, status) {
-  var orders = getOrders();
-  for (var i = 0; i < orders.length; i++) {
-    if (orders[i].id === orderId) orders[i].status = status;
-  }
-  saveOrders(orders);
 }
 
 function formatPrice(num) {
