@@ -2,7 +2,7 @@ var ADMIN_USERNAME = "laptop-valley@outlook.com";
 var ADMIN_PASSWORD = "Hasan@admin2529";
 
 var IDLE_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
-var IDLE_CHECK_INTERVAL_MS = 10 * 1000; // check every 10 seconds
+var IDLE_CHECK_INTERVAL_MS = 10 * 1000;
 var idleCheckTimer = null;
 var lastActivityWriteTime = 0;
 
@@ -30,29 +30,22 @@ function updateLastActivity() {
 
 function checkIdleTimeout() {
   if (!isAdminLoggedIn()) return;
-
   var last = parseInt(sessionStorage.getItem('lv_admin_last_activity') || '0', 10);
   if (!last) {
     sessionStorage.setItem('lv_admin_last_activity', Date.now().toString());
     return;
   }
-
-  var now = Date.now();
-  var elapsed = now - last;
-
-  if (elapsed >= IDLE_TIMEOUT_MS) {
+  if (Date.now() - last >= IDLE_TIMEOUT_MS) {
     autoLogoutDueToInactivity();
   }
 }
 
-// ---- Clears login form fields (username + password) ----
 function clearLoginFields() {
   var userEl = document.getElementById('adminUser');
   var passEl = document.getElementById('adminPass');
   if (userEl) userEl.value = '';
   if (passEl) passEl.value = '';
 
-  // Also reset the eye icon back to "hidden" state
   var eyeOpen = document.getElementById('eyeOpen');
   var eyeClosed = document.getElementById('eyeClosed');
   if (passEl) passEl.type = 'password';
@@ -63,43 +56,31 @@ function clearLoginFields() {
 function autoLogoutDueToInactivity() {
   sessionStorage.removeItem('lv_admin_logged');
   sessionStorage.removeItem('lv_admin_last_activity');
-
   if (idleCheckTimer) {
     clearInterval(idleCheckTimer);
     idleCheckTimer = null;
   }
-
   var dashboard = document.getElementById('adminDashboard');
   var loginScreen = document.getElementById('loginScreen');
   if (dashboard) dashboard.style.display = 'none';
   if (loginScreen) loginScreen.style.display = 'block';
-
-  var loginError = document.getElementById('loginError');
-  if (loginError) loginError.style.display = 'none';
-
   clearLoginFields();
-
   showToast('Session expired due to inactivity. Please login again.', true);
 }
 
 function startIdleWatcher() {
   sessionStorage.setItem('lv_admin_last_activity', Date.now().toString());
   lastActivityWriteTime = Date.now();
-
   var activityEvents = ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart', 'click'];
   for (var i = 0; i < activityEvents.length; i++) {
     document.addEventListener(activityEvents[i], updateLastActivity, true);
   }
-
   if (idleCheckTimer) clearInterval(idleCheckTimer);
   idleCheckTimer = setInterval(checkIdleTimeout, IDLE_CHECK_INTERVAL_MS);
 
   document.addEventListener('visibilitychange', function() {
-    if (document.visibilityState === 'visible') {
-      checkIdleTimeout();
-    }
+    if (document.visibilityState === 'visible') checkIdleTimeout();
   });
-
   window.addEventListener('focus', function() {
     checkIdleTimeout();
   });
@@ -113,12 +94,9 @@ function stopIdleWatcher() {
 }
 
 function doLogin() {
-  var userEl = document.getElementById('adminUser');
-  var passEl = document.getElementById('adminPass');
+  var user = document.getElementById('adminUser').value;
+  var pass = document.getElementById('adminPass').value;
   var errorEl = document.getElementById('loginError');
-
-  var user = userEl.value;
-  var pass = passEl.value;
 
   if (user === ADMIN_USERNAME && pass === ADMIN_PASSWORD) {
     sessionStorage.setItem('lv_admin_logged', 'true');
@@ -190,39 +168,23 @@ function handleLaptopSubmit(e) {
     description: document.getElementById('f_description').value
   };
 
-  if (!laptopData.brand || !laptopData.model || !laptopData.processorBrand ||
-      !laptopData.processorModel || !laptopData.ramSize || !laptopData.ramType ||
-      !laptopData.storageType || !laptopData.storageCapacity || !laptopData.displaySize ||
-      !laptopData.displayResolution || !laptopData.displayType || !laptopData.graphics ||
-      !laptopData.os || !laptopData.battery || !laptopData.weight || !laptopData.color ||
-      !laptopData.warranty || !laptopData.image) {
-    showToast('Please fill all required fields', true);
-    return;
-  }
-
-  if (isNaN(laptopData.price) || laptopData.price <= 0) {
-    showToast('Please enter a valid price', true);
-    return;
-  }
-
-  if (isNaN(laptopData.stock) || laptopData.stock < 0) {
-    showToast('Please enter a valid stock quantity', true);
-    return;
-  }
-
   var editId = document.getElementById('f_editId').value;
-
   if (editId) {
-    updateLaptop(editId, laptopData);
-    showToast('Laptop updated successfully');
-  } else {
-    addLaptop(laptopData);
-    showToast('Laptop added successfully');
+    laptopData.id = editId;
   }
 
-  resetForm();
-  renderLaptopTable();
-  updateStats();
+  DB.saveLaptop(laptopData).then(function(res) {
+    if (res.success) {
+      showToast(editId ? 'Laptop updated successfully in database' : 'Laptop added to database');
+      resetForm();
+      DB.fetchLaptops().then(function() {
+        renderLaptopTable();
+        updateStats();
+      });
+    } else {
+      showToast('Error saving laptop to database', true);
+    }
+  });
 }
 
 function editLaptop(id) {
@@ -266,11 +228,14 @@ function editLaptop(id) {
 }
 
 function deleteLaptopHandler(id) {
-  if (confirm('Are you sure you want to delete this laptop?')) {
-    deleteLaptop(id);
-    renderLaptopTable();
-    updateStats();
-    showToast('Laptop deleted');
+  if (confirm('Are you sure you want to delete this laptop from the server database?')) {
+    DB.deleteLaptop(id).then(function() {
+      DB.fetchLaptops().then(function() {
+        renderLaptopTable();
+        updateStats();
+        showToast('Laptop deleted from database');
+      });
+    });
   }
 }
 
@@ -280,7 +245,7 @@ function renderLaptopTable() {
   if (!tbody) return;
 
   if (laptops.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:30px;">No laptops added yet.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:30px;">No laptops in database yet.</td></tr>';
     return;
   }
 
@@ -293,7 +258,7 @@ function renderLaptopTable() {
     html += '<td>' + lp.model + '</td>';
     html += '<td>' + lp.processorModel + ', ' + lp.ramSize + ', ' + lp.storageCapacity + '</td>';
     html += '<td>' + formatPrice(lp.price) + '</td>';
-    html += '<td>' + lp.stock + '</td>';
+    html += '<td><strong>' + lp.stock + '</strong></td>';
     html += '<td><div class="action-btns">';
     html += '<button type="button" class="btn btn-outline icon-btn" onclick="editLaptop(\'' + lp.id + '\')">Edit</button>';
     html += '<button type="button" class="btn btn-danger icon-btn" onclick="deleteLaptopHandler(\'' + lp.id + '\')">Delete</button>';
@@ -316,117 +281,78 @@ function getStatusLabel(status) {
   return 'Pending';
 }
 
+var CURRENT_ORDERS = [];
+
 function renderOrdersTable() {
-  var orders = getOrders();
-  var tbody = document.getElementById('ordersTableBody');
-  if (!tbody) return;
+  DB.fetchOrders().then(function(orders) {
+    CURRENT_ORDERS = orders;
+    var tbody = document.getElementById('ordersTableBody');
+    if (!tbody) return;
 
-  if (orders.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:30px;">No orders yet.</td></tr>';
-    return;
-  }
-
-  var html = '';
-  for (var i = 0; i < orders.length; i++) {
-    var order = orders[i];
-    var currentStatus = order.status || 'pending';
-    var itemsHtml = '';
-    for (var j = 0; j < order.items.length; j++) {
-      itemsHtml += order.items[j].name + ' x' + order.items[j].qty + '<br>';
+    if (orders.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:30px;">No orders in database yet.</td></tr>';
+      return;
     }
-    html += '<tr>';
-    html += '<td>' + order.id + '</td>';
-    html += '<td>' + order.customerName + '</td>';
-    html += '<td>' + order.customerPhone + '<br><small>' + order.customerEmail + '</small></td>';
-    html += '<td>' + itemsHtml + '</td>';
-    html += '<td>' + formatPrice(order.total) + '</td>';
-    html += '<td>' + order.paymentMethod + '</td>';
-    html += '<td><span id="statusBadge-' + order.id + '" class="badge ' + getStatusClass(currentStatus) + '">' + getStatusLabel(currentStatus) + '</span></td>';
-    html += '<td><div class="action-btns">';
-    html += '<select class="status-dropdown" onchange="changeOrderStatus(\'' + order.id + '\', this.value)" data-current="' + currentStatus + '">';
-    html += '<option value="pending"' + (currentStatus === 'pending' ? ' selected' : '') + '>Pending</option>';
-    html += '<option value="confirmed"' + (currentStatus === 'confirmed' ? ' selected' : '') + '>Confirmed</option>';
-    html += '<option value="declined"' + (currentStatus === 'declined' ? ' selected' : '') + '>Declined</option>';
-    html += '<option value="refund"' + (currentStatus === 'refund' ? ' selected' : '') + '>Refund</option>';
-    html += '</select>';
-    html += '<button type="button" class="btn btn-outline icon-btn" onclick="printInvoice(\'' + order.id + '\')">Print Invoice</button>';
-    html += '<button type="button" class="btn btn-danger icon-btn" onclick="deleteOrder(\'' + order.id + '\')">Delete</button>';
-    html += '</div></td></tr>';
-  }
-  tbody.innerHTML = html;
+
+    var html = '';
+    for (var i = 0; i < orders.length; i++) {
+      var order = orders[i];
+      var currentStatus = order.status || 'pending';
+      var itemsHtml = '';
+      for (var j = 0; j < order.items.length; j++) {
+        itemsHtml += order.items[j].name + ' x' + order.items[j].qty + '<br>';
+      }
+      html += '<tr>';
+      html += '<td>' + order.id + '</td>';
+      html += '<td>' + order.customerName + '</td>';
+      html += '<td>' + order.customerPhone + '<br><small>' + order.customerEmail + '</small></td>';
+      html += '<td>' + itemsHtml + '</td>';
+      html += '<td>' + formatPrice(order.total) + '</td>';
+      html += '<td>' + order.paymentMethod + '</td>';
+      html += '<td><span class="badge ' + getStatusClass(currentStatus) + '">' + getStatusLabel(currentStatus) + '</span></td>';
+      html += '<td><div class="action-btns">';
+      html += '<select class="status-dropdown" onchange="changeOrderStatus(\'' + order.id + '\', this.value)" data-current="' + currentStatus + '">';
+      html += '<option value="pending"' + (currentStatus === 'pending' ? ' selected' : '') + '>Pending</option>';
+      html += '<option value="confirmed"' + (currentStatus === 'confirmed' ? ' selected' : '') + '>Confirmed</option>';
+      html += '<option value="declined"' + (currentStatus === 'declined' ? ' selected' : '') + '>Declined</option>';
+      html += '<option value="refund"' + (currentStatus === 'refund' ? ' selected' : '') + '>Refund</option>';
+      html += '</select>';
+      html += '<button type="button" class="btn btn-outline icon-btn" onclick="printInvoice(\'' + order.id + '\')">Print Invoice</button>';
+      html += '<button type="button" class="btn btn-danger icon-btn" onclick="deleteOrderHandler(\'' + order.id + '\')">Delete</button>';
+      html += '</div></td></tr>';
+    }
+    tbody.innerHTML = html;
+  });
 }
 
 function changeOrderStatus(orderId, newStatus) {
-  var validStatuses = ['pending', 'confirmed', 'declined', 'refund'];
-  if (validStatuses.indexOf(newStatus) === -1) return;
-
-  var orders = getOrders();
-  var oldStatus = '';
-  var order = null;
-  for (var i = 0; i < orders.length; i++) {
-    if (orders[i].id === orderId) {
-      oldStatus = orders[i].status || 'pending';
-      orders[i].status = newStatus;
-      order = orders[i];
+  DB.updateOrderStatus(orderId, newStatus).then(function(res) {
+    if (res.success) {
+      showToast('Order status updated in database');
+      DB.fetchLaptops().then(function() {
+        renderOrdersTable();
+        renderLaptopTable();
+        updateStats();
+      });
+    } else {
+      showToast('Failed to update status', true);
     }
-  }
-
-  var shouldRestoreStock =
-    (oldStatus === 'pending' || oldStatus === 'confirmed') &&
-    (newStatus === 'refund' || newStatus === 'declined');
-
-  var shouldDeductStock =
-    (oldStatus === 'refund' || oldStatus === 'declined') &&
-    (newStatus === 'pending' || newStatus === 'confirmed');
-
-  if (shouldRestoreStock) {
-    var laptops = getLaptops();
-    for (var k = 0; k < laptops.length; k++) {
-      for (var m = 0; m < order.items.length; m++) {
-        if (laptops[k].model === order.items[m].name) {
-          laptops[k].stock += order.items[m].qty;
-        }
-      }
-    }
-    saveLaptops(laptops);
-  } else if (shouldDeductStock) {
-    var laptops2 = getLaptops();
-    for (var k2 = 0; k2 < laptops2.length; k2++) {
-      for (var m2 = 0; m2 < order.items.length; m2++) {
-        if (laptops2[k2].model === order.items[m2].name) {
-          laptops2[k2].stock = Math.max(0, laptops2[k2].stock - order.items[m2].qty);
-        }
-      }
-    }
-    saveLaptops(laptops2);
-  }
-
-  saveOrders(orders);
-  renderOrdersTable();
-  updateStats();
-  showToast('Order status updated to ' + getStatusLabel(newStatus));
+  });
 }
 
-function deleteOrder(orderId) {
-  if (!confirm('Are you sure you want to delete this order? This action cannot be undone.')) {
-    return;
-  }
-  var orders = getOrders();
-  var filtered = [];
-  for (var i = 0; i < orders.length; i++) {
-    if (orders[i].id !== orderId) filtered.push(orders[i]);
-  }
-  saveOrders(filtered);
-  renderOrdersTable();
-  updateStats();
-  showToast('Order deleted successfully');
+function deleteOrderHandler(orderId) {
+  if (!confirm('Are you sure you want to permanently delete this order from database?')) return;
+  DB.deleteOrder(orderId).then(function() {
+    showToast('Order deleted from database');
+    renderOrdersTable();
+    updateStats();
+  });
 }
 
 function printInvoice(orderId) {
-  var orders = getOrders();
   var order = null;
-  for (var i = 0; i < orders.length; i++) {
-    if (orders[i].id === orderId) order = orders[i];
+  for (var i = 0; i < CURRENT_ORDERS.length; i++) {
+    if (CURRENT_ORDERS[i].id === orderId) order = CURRENT_ORDERS[i];
   }
   if (!order) {
     showToast('Order not found', true);
@@ -434,23 +360,16 @@ function printInvoice(orderId) {
   }
 
   var currentStatus = order.status || 'pending';
-
   var statusColor = '#fef3c7';
   var statusTextColor = '#92400e';
   var statusLabel = 'Pending';
 
   if (currentStatus === 'confirmed') {
-    statusColor = '#dcfce7';
-    statusTextColor = '#166534';
-    statusLabel = 'Confirmed';
+    statusColor = '#dcfce7'; statusTextColor = '#166534'; statusLabel = 'Confirmed';
   } else if (currentStatus === 'declined') {
-    statusColor = '#fee2e2';
-    statusTextColor = '#991b1b';
-    statusLabel = 'Declined';
+    statusColor = '#fee2e2'; statusTextColor = '#991b1b'; statusLabel = 'Declined';
   } else if (currentStatus === 'refund') {
-    statusColor = '#fef3c7';
-    statusTextColor = '#92400e';
-    statusLabel = 'Refund';
+    statusColor = '#fef3c7'; statusTextColor = '#92400e'; statusLabel = 'Refund';
   }
 
   var itemsRows = '';
@@ -535,27 +454,29 @@ function printInvoice(orderId) {
 }
 
 function updateStats() {
-  var laptops = getLaptops();
-  var orders = getOrders();
-  var pending = 0;
-  var revenue = 0;
-  for (var i = 0; i < orders.length; i++) {
-    if (orders[i].status === 'pending') pending++;
-    if (orders[i].status !== 'declined' && orders[i].status !== 'refund') {
-      revenue += orders[i].total;
+  DB.fetchOrders().then(function(orders) {
+    var laptops = getLaptops();
+    var pending = 0;
+    var revenue = 0;
+    for (var i = 0; i < orders.length; i++) {
+      if (orders[i].status === 'pending') pending++;
+      if (orders[i].status !== 'declined' && orders[i].status !== 'refund') {
+        revenue += orders[i].total;
+      }
     }
-  }
-
-  document.getElementById('statLaptops').textContent = laptops.length;
-  document.getElementById('statOrders').textContent = orders.length;
-  document.getElementById('statPending').textContent = pending;
-  document.getElementById('statRevenue').textContent = formatPrice(revenue);
+    document.getElementById('statLaptops').textContent = laptops.length;
+    document.getElementById('statOrders').textContent = orders.length;
+    document.getElementById('statPending').textContent = pending;
+    document.getElementById('statRevenue').textContent = formatPrice(revenue);
+  });
 }
 
 function initAdminDashboard() {
-  updateStats();
-  renderLaptopTable();
-  renderOrdersTable();
+  DB.fetchLaptops().then(function() {
+    updateStats();
+    renderLaptopTable();
+    renderOrdersTable();
+  });
 }
 
 document.addEventListener('DOMContentLoaded', function() {
