@@ -57,6 +57,7 @@ function loadBrandFilter() {
   }
   var select = document.getElementById('filterBrand');
   if (!select) return;
+  select.innerHTML = '<option value="">All Brands</option>';
   for (var j = 0; j < brands.length; j++) {
     var opt = document.createElement('option');
     opt.value = brands[j];
@@ -156,9 +157,9 @@ function showOutOfStockPopup(modelName) {
   var textEl = document.getElementById('stockModalText');
   if (textEl) {
     if (modelName) {
-      textEl.textContent = modelName + ' is currently out of stock. Please wait for restock, our team is working on it.';
+      textEl.textContent = modelName + ' is currently out of stock. Please wait for restock by seller.';
     } else {
-      textEl.textContent = 'This laptop is currently out of stock. Please wait for restock.';
+      textEl.textContent = 'This laptop is currently out of stock. Please wait for restock by seller.';
     }
   }
   var modal = document.getElementById('stockModal');
@@ -175,7 +176,6 @@ function addToCartHandler(id) {
   if (!lp) return;
 
   var available = getAvailableStock(id);
-
   if (available <= 0) {
     showOutOfStockPopup(lp.model);
     renderLaptops(getLaptops());
@@ -189,9 +189,24 @@ function addToCartHandler(id) {
   showToast('Added to cart! ' + (available - 1) + ' left in stock');
 }
 
+function refreshStoreData() {
+  DB.fetchLaptops().then(function(laptops) {
+    validateCart();
+    loadBrandFilter();
+    applyFilters();
+    updateCartBadge();
+  });
+}
+
 document.addEventListener('DOMContentLoaded', function() {
-  validateCart();
-  loadBrandFilter();
-  renderLaptops(getLaptops());
-  updateCartBadge();
+  refreshStoreData();
+
+  // Real-time stock sync: Poll database every 7 seconds for live global inventory
+  setInterval(function() {
+    DB.fetchLaptops().then(function() {
+      validateCart();
+      applyFilters();
+      updateCartBadge();
+    });
+  }, 7000);
 });
