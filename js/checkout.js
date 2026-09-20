@@ -13,7 +13,6 @@ try {
 
 function renderOrderSummary() {
   var cart = getCart();
-  var laptops = getLaptops();
   var container = document.getElementById('orderItemsSummary');
 
   if (cart.length === 0) {
@@ -24,10 +23,7 @@ function renderOrderSummary() {
   var html = '';
   for (var i = 0; i < cart.length; i++) {
     var item = cart[i];
-    var lp = null;
-    for (var j = 0; j < laptops.length; j++) {
-      if (laptops[j].id === item.id) lp = laptops[j];
-    }
+    var lp = getLaptopById(item.id);
     if (!lp) continue;
     html += '<div class="order-summary-item"><span>' + lp.model + ' x ' + item.qty + '</span><span>' + formatPrice(lp.price * item.qty) + '</span></div>';
   }
@@ -50,17 +46,12 @@ if (checkoutFormEl) {
     e.preventDefault();
 
     var cart = getCart();
-    var laptops = getLaptops();
-    var total = getCartTotal();
-
     var items = [];
     for (var i = 0; i < cart.length; i++) {
-      var lp = null;
-      for (var j = 0; j < laptops.length; j++) {
-        if (laptops[j].id === cart[i].id) lp = laptops[j];
-      }
+      var lp = getLaptopById(cart[i].id);
       if (lp) {
         items.push({
+          id: lp.id,
           name: lp.model,
           brand: lp.brand,
           qty: cart[i].qty,
@@ -80,58 +71,61 @@ if (checkoutFormEl) {
       paymentMethod: document.getElementById('paymentMethod').value,
       notes: document.getElementById('orderNotes').value,
       items: items,
-      total: total
+      total: getCartTotal()
     };
 
     var btn = document.getElementById('placeOrderBtn');
     btn.disabled = true;
-    btn.textContent = 'Placing Order...';
+    btn.textContent = 'Processing with Live Database...';
 
-    var itemsText = '';
-    for (var k = 0; k < items.length; k++) {
-      itemsText += items[k].name + ' (' + items[k].brand + ') x' + items[k].qty + ' - ' + formatPrice(items[k].subtotal) + '\n';
-    }
-
-    var templateParams = {
-      to_email: STORE_EMAIL,
-      customer_name: orderData.customerName,
-      customer_phone: orderData.customerPhone,
-      customer_email: orderData.customerEmail,
-      address: orderData.address + ', ' + orderData.city + ' - ' + orderData.pin,
-      payment_method: orderData.paymentMethod,
-      notes: orderData.notes || 'None',
-      order_items: itemsText,
-      total_amount: formatPrice(orderData.total),
-      order_date: new Date().toLocaleString()
-    };
-
-    var savedOrder = addOrder(orderData);
-
-    var allLaptops = getLaptops();
-    for (var m = 0; m < allLaptops.length; m++) {
-      for (var n = 0; n < items.length; n++) {
-        if (allLaptops[m].model === items[n].name) {
-          allLaptops[m].stock = Math.max(0, allLaptops[m].stock - items[n].qty);
-        }
+    // 1. Submit order to PHP/SQLite server database
+    DB.createOrder(orderData).then(function(res) {
+      if (!res.success) {
+        btn.disabled = false;
+        btn.textContent = 'Place Order';
+        showToast(res.error || 'Failed to place order. Out of stock!', true);
+        return;
       }
-    }
-    saveLaptops(allLaptops);
 
-    if (typeof emailjs !== 'undefined') {
-      emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, templateParams)
-        .then(function() {
-          clearCart();
-          showOrderSuccess(savedOrder.id, orderData, false);
-        })
-        .catch(function(err) {
-          console.error('Email failed:', err);
-          clearCart();
-          showOrderSuccess(savedOrder.id, orderData, true);
-        });
-    } else {
+      var orderId = res.orderId;
+      var itemsText = '';
+      for (var k = 0; k < items.length; k++) {
+        itemsText += items[k].name + ' (' + items[k].brand + ') x' + items[k].qty + ' - ' + formatPrice(items[k].subtotal) + '\n';
+      }
+
+      var templateParams = {
+        to_email: STORE_EMAIL,
+        customer_name: orderData.customerName,
+        customer_phone: orderData.customerPhone,
+        customer_email: orderData.customerEmail,
+        address: orderData.address + ', ' + orderData.city + ' - ' + orderData.pin,
+        payment_method: orderData.paymentMethod,
+        notes: orderData.notes || 'None',
+        order_items: itemsText,
+        total_amount: formatPrice(orderData.total),
+        order_date: new Date().toLocaleString()
+      };
+
       clearCart();
-      showOrderSuccess(savedOrder.id, orderData, true);
-    }
+
+      // 2. Send email notification via EmailJS
+      if (typeof emailjs !== 'undefined') {
+        emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, templateParams)
+          .then(function() {
+            showOrderSuccess(orderId, orderData, false);
+          })
+          .catch(function(err) {
+            console.error('Email failed:', err);
+            showOrderSuccess(orderId, orderData, true);
+          });
+      } else {
+        showOrderSuccess(orderId, orderData, true);
+      }
+    }).catch(function(err) {
+      btn.disabled = false;
+      btn.textContent = 'Place Order';
+      showToast('Server error. Please try again.', true);
+    });
   });
 }
 
@@ -140,14 +134,17 @@ function showOrderSuccess(orderId, orderData, emailFailed) {
   var html = '<div class="card" style="grid-column:1/-1; text-align:center; padding:60px 30px;">';
   html += '<h2 style="color:#1e40af; margin:20px 0 10px;">Order Placed Successfully!</h2>';
   html += '<p style="color:#64748b; margin-bottom:20px;">Order ID: <strong>' + orderId + '</strong></p>';
-  html += '<p style="max-width:500px; margin:0 auto 20px; color:#64748b;">Thank you, ' + orderData.customerName + '! Your order for <strong>' + formatPrice(orderData.total) + '</strong> has been received. Our team will contact you at <strong>' + orderData.customerPhone + '</strong> via Call or WhatsApp within 24 hours to confirm the details.</p>';
+  html += '<p style="max-width:500px; margin:0 auto 20px; color:#64748b;">Thank you, ' + orderData.customerName + '! Your order for <strong>' + formatPrice(orderData.total) + '</strong> has been saved to the database. Our team will contact you at <strong>' + orderData.customerPhone + '</strong> via Call or WhatsApp within 24 hours to confirm the details.</p>';
   if (emailFailed) {
-    html += '<p style="color:#ef4444; font-size:0.85rem;">Note: confirmation email may be delayed but your order is safely recorded.</p>';
+    html += '<p style="color:#ef4444; font-size:0.85rem;">Note: Confirmation email may be delayed, but your order is safely saved in the server database.</p>';
   }
   html += '<a href="index.html" class="btn btn-primary" style="margin-top:15px; display:inline-block;">Continue Shopping</a>';
   html += '</div>';
   wrapper.innerHTML = html;
 }
 
-validateCart();
-renderOrderSummary();
+// Initial fetch from live database before rendering checkout
+DB.fetchLaptops().then(function() {
+  validateCart();
+  renderOrderSummary();
+});
