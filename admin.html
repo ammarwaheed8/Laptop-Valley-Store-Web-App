@@ -313,6 +313,27 @@
 
 <div class="toast" id="toast"></div>
 
+<div class="modal-overlay" id="changePassModal">
+  <div class="modal-box" style="max-width:420px;">
+    <button class="modal-close" onclick="closeChangePasswordModal()">X</button>
+    <h2 style="color:#1e40af; margin-bottom:20px;">Change Admin Password</h2>
+    <div class="form-group">
+      <label>Current Password</label>
+      <input type="password" id="cp_current">
+    </div>
+    <div class="form-group">
+      <label>New Password (min 6 characters)</label>
+      <input type="password" id="cp_new">
+    </div>
+    <div class="form-group">
+      <label>Confirm New Password</label>
+      <input type="password" id="cp_confirm">
+    </div>
+    <p id="cp_error" class="error-text" style="display:none;"></p>
+    <button type="button" class="btn btn-primary btn-block" onclick="submitChangePassword()">Update Password</button>
+  </div>
+</div>
+  
 <script src="js/data.js"></script>
 <script src="js/admin.js"></script>
 </body>
