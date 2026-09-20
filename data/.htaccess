@@ -1,1 +1,5 @@
-
+# Protect the SQLite database file from direct browser downloads
+<Files "*.db">
+  Order deny,allow
+  Deny from all
+</Files>
