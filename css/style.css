@@ -483,6 +483,25 @@ footer p { opacity:0.8; font-size:0.9rem; margin-top:15px; }
   border-radius:14px;
   box-shadow: var(--shadow);
   text-align:center;
+  position: relative;
+}
+
+.back-to-store-btn {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  background: var(--light-blue);
+  color: var(--primary-blue);
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  transition: 0.3s;
+}
+
+.back-to-store-btn:hover {
+  background: var(--secondary-blue);
+  color: white;
 }
 
 .admin-header {
