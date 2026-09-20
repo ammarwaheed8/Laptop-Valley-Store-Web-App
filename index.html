@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Laptop Valley - Premium Laptops Pakistan</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="nav-content">
+    <a href="index.html" class="logo">Laptop<span>Valley</span></a>
+    <ul class="nav-links" id="navLinks">
+      <li><a href="index.html">Home</a></li>
+      <li><a href="#shop">Shop</a></li>
+      <li><a href="#contact">Contact</a></li>
+      <li><a href="admin.html" class="admin-link">Admin Panel</a></li>
+    </ul>
+    <div style="display:flex; align-items:center; gap:20px;">
+      <div class="cart-icon" onclick="toggleCart()">
+        Cart <span class="cart-count" id="cartCount">0</span>
+      </div>
+      <div class="mobile-toggle" onclick="toggleMobileMenu()">☰</div>
+    </div>
+  </div>
+</nav>
+
+<section class="hero">
+  <h1>Find Your Perfect Laptop</h1>
+  <p>Pakistan's trusted laptop store. Premium laptops for gaming, work, and everyday use, delivered nationwide with genuine warranty.</p>
+  <a href="#shop" class="hero-btn">Shop Now</a>
+</section>
+
+<div class="container" id="shop">
+  <div class="filter-bar">
+    <select id="filterBrand" onchange="applyFilters()">
+      <option value="">All Brands</option>
+    </select>
+    <select id="filterRam" onchange="applyFilters()">
+      <option value="">All RAM</option>
+      <option value="4GB">4GB</option>
+      <option value="8GB">8GB</option>
+      <option value="16GB">16GB</option>
+      <option value="32GB">32GB</option>
+      <option value="64GB">64GB</option>
+    </select>
+    <select id="sortPrice" onchange="applyFilters()">
+      <option value="">Sort by Price</option>
+      <option value="low">Price: Low to High</option>
+      <option value="high">Price: High to Low</option>
+    </select>
+    <input type="text" id="searchBox" placeholder="Search laptops..." oninput="applyFilters()">
+  </div>
+</div>
+
+<h2 class="section-title">Available Laptops</h2>
+<div class="laptop-grid" id="laptopGrid"></div>
+
+<footer id="contact">
+  <div class="logo" style="justify-content:center; color:white;">Laptop<span style="color:#60a5fa">Valley</span></div>
+  <p>Call/WhatsApp | Hassan Malik: +92-330-0002529</p>
+  <p>Call/WhatsApp | Haseeb Malik: +92-302-1104868</p>
+  <p>Email | support@laptopvalley.pk</p>
+  <p>Cash on Delivery | EasyPaisa | JazzCash | Bank Transfer Available Nationwide</p>
+  <p>&copy; 2026 Laptop Valley. All rights reserved.</p>
+  <span id="footer-divider"></span>
+  <p class="footer-credit">Developed and Powered by <a href="http://zivalogix.netlify.app/" target="_blank"><img src="https://zivalogix.netlify.app/assets/t-logo.png" alt="zivalogix"></p>
+</footer>
+
+<!-- LAPTOP DETAIL MODAL -->
+<div class="modal-overlay" id="detailModal">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeModal()">X</button>
+    <div id="modalContent"></div>
+  </div>
+</div>
+
+<!-- OUT OF STOCK ALERT MODAL -->
+<div class="modal-overlay" id="stockModal">
+  <div class="modal-box" style="max-width:420px; text-align:center;">
+    <button class="modal-close" onclick="closeStockModal()">X</button>
+    <div class="stock-icon-circle">
+      <div class="stock-icon-dot"></div>
+    </div>
+    <h2 style="color:#ef4444; margin-bottom:10px;">Out of Stock</h2>
+    <p id="stockModalText" style="color:#64748b;">This laptop is currently out of stock. Please wait for restock.</p>
+    <button type="button" class="btn btn-primary btn-block" style="margin-top:20px;" onclick="closeStockModal()">Okay, Got it</button>
+  </div>
+</div>
+
+<div class="overlay-bg" id="overlayBg" onclick="toggleCart()"></div>
+<div class="cart-sidebar" id="cartSidebar">
+  <div class="cart-header">
+    <h3>Your Cart</h3>
+    <button onclick="toggleCart()">X</button>
+  </div>
+  <div class="cart-items" id="cartItemsContainer"></div>
+  <div class="cart-footer" id="cartFooter"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="js/data.js"></script>
+<script src="js/cart.js"></script>
+<script src="js/store.js"></script>
+</body>
+</html>

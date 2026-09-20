@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Checkout - Laptop Valley</title>
+<link rel="stylesheet" href="css/style.css">
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="nav-content">
+    <a href="index.html" class="logo">Laptop<span>Valley</span></a>
+    <a href="index.html" class="btn btn-outline">Back to Shop</a>
+  </div>
+</nav>
+
+<div class="checkout-wrapper">
+  <div class="card">
+    <h2 style="color:#1e40af; margin-bottom:20px;">Billing and Shipping Details</h2>
+    <form id="checkoutForm" action="https://api.web3forms.com/submit" method="POST">
+      <!-- Replace the Key with the keys of the desired email for receiving form submission! -->
+      <input type="hidden" name="access_key" value="75b98f05-7ad0-443d-aa8c-3f3815574c68">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Full Name *</label>
+          <input type="text" id="custName" required>
+        </div>
+        <div class="form-group">
+          <label>Phone Number (WhatsApp) *</label>
+          <input type="tel" id="custPhone" placeholder="+92 300 1234567" required>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Email Address *</label>
+        <input type="email" id="custEmail" required>
+      </div>
+      <div class="form-group">
+        <label>Full Address *</label>
+        <textarea id="custAddress" rows="3" placeholder="House number, Street, Area" required></textarea>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>City *</label>
+          <select id="custCity" required>
+            <option value="">Select City</option>
+            <option value="Karachi">Karachi</option>
+            <option value="Lahore">Lahore</option>
+            <option value="Islamabad">Islamabad</option>
+            <option value="Rawalpindi">Rawalpindi</option>
+            <option value="Faisalabad">Faisalabad</option>
+            <option value="Multan">Multan</option>
+            <option value="Peshawar">Peshawar</option>
+            <option value="Quetta">Quetta</option>
+            <option value="Sialkot">Sialkot</option>
+            <option value="Gujranwala">Gujranwala</option>
+            <option value="Hyderabad">Hyderabad</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Postal Code *</label>
+          <input type="text" id="custPin" placeholder="e.g. 54000" required>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Payment Method *</label>
+        <select id="paymentMethod" required>
+          <option value="COD">Cash on Delivery (COD)</option>
+          <option value="EasyPaisa">EasyPaisa</option>
+          <option value="JazzCash">JazzCash</option>
+          <option value="BankTransfer">Bank Transfer</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Order Notes (optional)</label>
+        <textarea id="orderNotes" rows="2" placeholder="Any special instructions"></textarea>
+      </div>
+
+      <div class="contact-note">
+        After placing your order, our team will contact you via Call or WhatsApp within 24 hours to confirm your order details and delivery schedule.
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-block" style="margin-top:20px; padding:14px;" id="placeOrderBtn">
+        Place Order
+      </button>
+    </form>
+  </div>
+
+  <div class="card" style="height:fit-content;">
+    <h2 style="color:#1e40af; margin-bottom:20px;">Order Summary</h2>
+    <div id="orderItemsSummary"></div>
+    <div class="summary-total">
+      <span>Total Amount:</span>
+      <span id="summaryTotal"></span>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="js/data.js"></script>
+<script src="js/checkout.js"></script>
+</body>
+</html>
