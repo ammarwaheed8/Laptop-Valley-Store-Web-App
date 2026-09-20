@@ -60,7 +60,7 @@ $adminCount = $pdo->query("SELECT COUNT(*) FROM admins")->fetchColumn();
 if ($adminCount == 0) {
     $defaultHash = password_hash('admin123', PASSWORD_BCRYPT);
     $stmt = $pdo->prepare("INSERT INTO admins (username, password_hash) VALUES (?, ?)");
-    $stmt->execute(['admin', $defaultHash]);
+    $stmt->execute(['laptop-valley', $defaultHash]);
 }
 
 // ---- SEED DEFAULT LAPTOPS (only runs once) ----
