@@ -1,10 +1,5 @@
-var ADMIN_USERNAME = "laptop-valley@outlook.com";
-var ADMIN_PASSWORD = "Hasan@admin2529";
-
-var IDLE_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
-var IDLE_CHECK_INTERVAL_MS = 10 * 1000;
 var idleCheckTimer = null;
-var lastActivityWriteTime = 0;
+var heartbeatTimer = null;
 
 function showToast(msg, isError) {
   var toast = document.getElementById('toast');
@@ -13,31 +8,6 @@ function showToast(msg, isError) {
   toast.className = 'toast' + (isError ? ' error' : '');
   toast.style.display = 'block';
   setTimeout(function() { toast.style.display = 'none'; }, 3000);
-}
-
-function isAdminLoggedIn() {
-  return sessionStorage.getItem('lv_admin_logged') === 'true';
-}
-
-function updateLastActivity() {
-  if (!isAdminLoggedIn()) return;
-  var now = Date.now();
-  if (now - lastActivityWriteTime > 2000) {
-    sessionStorage.setItem('lv_admin_last_activity', now.toString());
-    lastActivityWriteTime = now;
-  }
-}
-
-function checkIdleTimeout() {
-  if (!isAdminLoggedIn()) return;
-  var last = parseInt(sessionStorage.getItem('lv_admin_last_activity') || '0', 10);
-  if (!last) {
-    sessionStorage.setItem('lv_admin_last_activity', Date.now().toString());
-    return;
-  }
-  if (Date.now() - last >= IDLE_TIMEOUT_MS) {
-    autoLogoutDueToInactivity();
-  }
 }
 
 function clearLoginFields() {
@@ -53,73 +23,161 @@ function clearLoginFields() {
   if (eyeClosed) eyeClosed.style.display = 'none';
 }
 
-function autoLogoutDueToInactivity() {
-  sessionStorage.removeItem('lv_admin_logged');
-  sessionStorage.removeItem('lv_admin_last_activity');
-  if (idleCheckTimer) {
-    clearInterval(idleCheckTimer);
-    idleCheckTimer = null;
-  }
-  var dashboard = document.getElementById('adminDashboard');
-  var loginScreen = document.getElementById('loginScreen');
-  if (dashboard) dashboard.style.display = 'none';
-  if (loginScreen) loginScreen.style.display = 'block';
+function showLoginScreen(message) {
+  stopSessionWatchers();
+  document.getElementById('adminDashboard').style.display = 'none';
+  document.getElementById('loginScreen').style.display = 'block';
   clearLoginFields();
-  showToast('Session expired due to inactivity. Please login again.', true);
+  if (message) showToast(message, true);
 }
 
-function startIdleWatcher() {
-  sessionStorage.setItem('lv_admin_last_activity', Date.now().toString());
-  lastActivityWriteTime = Date.now();
-  var activityEvents = ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart', 'click'];
-  for (var i = 0; i < activityEvents.length; i++) {
-    document.addEventListener(activityEvents[i], updateLastActivity, true);
-  }
-  if (idleCheckTimer) clearInterval(idleCheckTimer);
-  idleCheckTimer = setInterval(checkIdleTimeout, IDLE_CHECK_INTERVAL_MS);
-
-  document.addEventListener('visibilitychange', function() {
-    if (document.visibilityState === 'visible') checkIdleTimeout();
-  });
-  window.addEventListener('focus', function() {
-    checkIdleTimeout();
-  });
-}
-
-function stopIdleWatcher() {
-  if (idleCheckTimer) {
-    clearInterval(idleCheckTimer);
-    idleCheckTimer = null;
-  }
+function showDashboard() {
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('adminDashboard').style.display = 'block';
+  initAdminDashboard();
+  startSessionWatchers();
 }
 
 function doLogin() {
-  var user = document.getElementById('adminUser').value;
+  var user = document.getElementById('adminUser').value.trim();
   var pass = document.getElementById('adminPass').value;
   var errorEl = document.getElementById('loginError');
+  var loginBtn = document.getElementById('loginBtn');
 
-  if (user === ADMIN_USERNAME && pass === ADMIN_PASSWORD) {
-    sessionStorage.setItem('lv_admin_logged', 'true');
-    sessionStorage.setItem('lv_admin_last_activity', Date.now().toString());
-    document.getElementById('loginScreen').style.display = 'none';
-    document.getElementById('adminDashboard').style.display = 'block';
-    if (errorEl) errorEl.style.display = 'none';
-    initAdminDashboard();
-    startIdleWatcher();
-  } else {
-    if (errorEl) errorEl.style.display = 'block';
-    showToast('Invalid credentials', true);
+  if (!user || !pass) {
+    if (errorEl) {
+      errorEl.textContent = 'Please enter both username and password';
+      errorEl.style.display = 'block';
+    }
+    return;
   }
+
+  loginBtn.disabled = true;
+  loginBtn.textContent = 'Logging in...';
+
+  DB.login(user, pass).then(function(res) {
+    loginBtn.disabled = false;
+    loginBtn.textContent = 'Login';
+
+    if (res.success) {
+      if (errorEl) errorEl.style.display = 'none';
+      showDashboard();
+    } else {
+      if (errorEl) {
+        errorEl.textContent = res.error || 'Invalid credentials';
+        errorEl.style.display = 'block';
+      }
+      showToast(res.error || 'Invalid credentials', true);
+    }
+  }).catch(function() {
+    loginBtn.disabled = false;
+    loginBtn.textContent = 'Login';
+    showToast('Server error. Please try again.', true);
+  });
 }
 
 function doLogout() {
-  sessionStorage.removeItem('lv_admin_logged');
-  sessionStorage.removeItem('lv_admin_last_activity');
-  stopIdleWatcher();
-  clearLoginFields();
-  location.reload();
+  DB.logout().then(function() {
+    showLoginScreen(null);
+  });
 }
 
+// ---- SESSION WATCHERS (Server-verified idle timeout) ----
+var lastPingTime = 0;
+
+function pingActivity() {
+  var now = Date.now();
+  if (now - lastPingTime > 5000) { // throttle: max once per 5 sec
+    lastPingTime = now;
+    DB.heartbeat();
+  }
+}
+
+function checkSessionPeriodically() {
+  DB.checkSession().then(function(res) {
+    if (res.success && res.loggedIn === false) {
+      if (res.reason === 'idle_timeout') {
+        showLoginScreen('Session expired due to inactivity. Please login again.');
+      } else {
+        showLoginScreen(null);
+      }
+    }
+  });
+}
+
+function startSessionWatchers() {
+  var activityEvents = ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart', 'click'];
+  for (var i = 0; i < activityEvents.length; i++) {
+    document.addEventListener(activityEvents[i], pingActivity, true);
+  }
+
+  if (idleCheckTimer) clearInterval(idleCheckTimer);
+  idleCheckTimer = setInterval(checkSessionPeriodically, 15000); // check every 15 sec
+
+  document.addEventListener('visibilitychange', function() {
+    if (document.visibilityState === 'visible') {
+      checkSessionPeriodically();
+    }
+  });
+  window.addEventListener('focus', function() {
+    checkSessionPeriodically();
+  });
+}
+
+function stopSessionWatchers() {
+  if (idleCheckTimer) {
+    clearInterval(idleCheckTimer);
+    idleCheckTimer = null;
+  }
+}
+
+// ---- CHANGE PASSWORD ----
+function openChangePasswordModal() {
+  document.getElementById('changePassModal').classList.add('active');
+  document.getElementById('cp_current').value = '';
+  document.getElementById('cp_new').value = '';
+  document.getElementById('cp_confirm').value = '';
+  document.getElementById('cp_error').style.display = 'none';
+}
+
+function closeChangePasswordModal() {
+  document.getElementById('changePassModal').classList.remove('active');
+}
+
+function submitChangePassword() {
+  var current = document.getElementById('cp_current').value;
+  var newPass = document.getElementById('cp_new').value;
+  var confirm = document.getElementById('cp_confirm').value;
+  var errorEl = document.getElementById('cp_error');
+
+  if (!current || !newPass || !confirm) {
+    errorEl.textContent = 'Please fill all fields';
+    errorEl.style.display = 'block';
+    return;
+  }
+  if (newPass !== confirm) {
+    errorEl.textContent = 'New passwords do not match';
+    errorEl.style.display = 'block';
+    return;
+  }
+  if (newPass.length < 6) {
+    errorEl.textContent = 'New password must be at least 6 characters';
+    errorEl.style.display = 'block';
+    return;
+  }
+
+  DB.changePassword(current, newPass).then(function(res) {
+    if (res.success) {
+      showToast('Password changed successfully');
+      closeChangePasswordModal();
+    } else {
+      errorEl.textContent = res.error || 'Failed to change password';
+      errorEl.style.display = 'block';
+    }
+  });
+}
+
+// ---- TABS ----
 function switchTab(tabName, btnEl) {
   var contents = document.querySelectorAll('.tab-content');
   for (var i = 0; i < contents.length; i++) contents[i].classList.remove('active');
@@ -169,20 +227,20 @@ function handleLaptopSubmit(e) {
   };
 
   var editId = document.getElementById('f_editId').value;
-  if (editId) {
-    laptopData.id = editId;
-  }
+  if (editId) laptopData.id = editId;
 
   DB.saveLaptop(laptopData).then(function(res) {
     if (res.success) {
-      showToast(editId ? 'Laptop updated successfully in database' : 'Laptop added to database');
+      showToast(editId ? 'Laptop updated successfully' : 'Laptop added successfully');
       resetForm();
       DB.fetchLaptops().then(function() {
         renderLaptopTable();
         updateStats();
       });
+    } else if (res.error === 'Unauthorized. Please login as admin.') {
+      showLoginScreen('Session expired. Please login again.');
     } else {
-      showToast('Error saving laptop to database', true);
+      showToast('Error saving laptop', true);
     }
   });
 }
@@ -228,13 +286,17 @@ function editLaptop(id) {
 }
 
 function deleteLaptopHandler(id) {
-  if (confirm('Are you sure you want to delete this laptop from the server database?')) {
-    DB.deleteLaptop(id).then(function() {
-      DB.fetchLaptops().then(function() {
-        renderLaptopTable();
-        updateStats();
-        showToast('Laptop deleted from database');
-      });
+  if (confirm('Are you sure you want to delete this laptop?')) {
+    DB.deleteLaptop(id).then(function(res) {
+      if (res.success) {
+        DB.fetchLaptops().then(function() {
+          renderLaptopTable();
+          updateStats();
+          showToast('Laptop deleted');
+        });
+      } else if (res.error === 'Unauthorized. Please login as admin.') {
+        showLoginScreen('Session expired. Please login again.');
+      }
     });
   }
 }
@@ -245,7 +307,7 @@ function renderLaptopTable() {
   if (!tbody) return;
 
   if (laptops.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:30px;">No laptops in database yet.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:30px;">No laptops added yet.</td></tr>';
     return;
   }
 
@@ -290,7 +352,7 @@ function renderOrdersTable() {
     if (!tbody) return;
 
     if (orders.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:30px;">No orders in database yet.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:30px;">No orders yet.</td></tr>';
       return;
     }
 
@@ -328,12 +390,14 @@ function renderOrdersTable() {
 function changeOrderStatus(orderId, newStatus) {
   DB.updateOrderStatus(orderId, newStatus).then(function(res) {
     if (res.success) {
-      showToast('Order status updated in database');
+      showToast('Order status updated');
       DB.fetchLaptops().then(function() {
         renderOrdersTable();
         renderLaptopTable();
         updateStats();
       });
+    } else if (res.error === 'Unauthorized. Please login as admin.') {
+      showLoginScreen('Session expired. Please login again.');
     } else {
       showToast('Failed to update status', true);
     }
@@ -341,11 +405,15 @@ function changeOrderStatus(orderId, newStatus) {
 }
 
 function deleteOrderHandler(orderId) {
-  if (!confirm('Are you sure you want to permanently delete this order from database?')) return;
-  DB.deleteOrder(orderId).then(function() {
-    showToast('Order deleted from database');
-    renderOrdersTable();
-    updateStats();
+  if (!confirm('Are you sure you want to permanently delete this order?')) return;
+  DB.deleteOrder(orderId).then(function(res) {
+    if (res.success) {
+      showToast('Order deleted');
+      renderOrdersTable();
+      updateStats();
+    } else if (res.error === 'Unauthorized. Please login as admin.') {
+      showLoginScreen('Session expired. Please login again.');
+    }
   });
 }
 
@@ -401,12 +469,10 @@ function printInvoice(orderId) {
     '.status-badge{display:inline-block; padding:4px 12px; border-radius:12px; font-size:0.8rem; font-weight:600; background:' + statusColor + '; color:' + statusTextColor + ';}' +
     '@media print { body{padding:20px;} }' +
     '</style></head><body>' +
-
     '<div class="invoice-header">' +
     '<div><div class="company-name">Laptop Valley</div><p style="color:#64748b; font-size:0.85rem;">Premium Laptop Store - Pakistan</p></div>' +
     '<div><div class="invoice-title">INVOICE</div><p style="color:#64748b; font-size:0.85rem;">Order ID: ' + order.id + '</p><p style="color:#64748b; font-size:0.85rem;">Date: ' + new Date(order.date).toLocaleDateString() + '</p></div>' +
     '</div>' +
-
     '<div class="info-grid">' +
     '<div class="info-block">' +
     '<h4>Billed To</h4>' +
@@ -423,19 +489,15 @@ function printInvoice(orderId) {
     (order.notes ? '<p style="margin-top:8px;">Notes: ' + order.notes + '</p>' : '') +
     '</div>' +
     '</div>' +
-
     '<table>' +
     '<thead><tr><th>#</th><th>Item</th><th style="text-align:center;">Qty</th><th style="text-align:right;">Unit Price</th><th style="text-align:right;">Subtotal</th></tr></thead>' +
     '<tbody>' + itemsRows + '</tbody>' +
     '</table>' +
-
     '<div class="total-row">Total Amount: ' + formatPrice(order.total) + '</div>' +
-
     '<div class="footer-note">' +
     '<p>Thank you for shopping with Laptop Valley!</p>' +
     '<p>For queries, contact us at +92-300-1234567 or support@laptopvalley.pk</p>' +
     '</div>' +
-
     '</body></html>';
 
   var printWindow = window.open('', '_blank', 'width=800,height=900');
@@ -505,6 +567,9 @@ document.addEventListener('DOMContentLoaded', function() {
   var logoutBtn = document.getElementById('logoutBtn');
   if (logoutBtn) logoutBtn.addEventListener('click', doLogout);
 
+  var changePassBtn = document.getElementById('changePasswordBtn');
+  if (changePassBtn) changePassBtn.addEventListener('click', openChangePasswordModal);
+
   var tabBtns = document.querySelectorAll('.tab-btn');
   for (var i = 0; i < tabBtns.length; i++) {
     tabBtns[i].addEventListener('click', function() {
@@ -523,22 +588,13 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
 
-  if (isAdminLoggedIn()) {
-    var lastActivity = parseInt(sessionStorage.getItem('lv_admin_last_activity') || '0', 10);
-    var now = Date.now();
-
-    if (lastActivity && (now - lastActivity) >= IDLE_TIMEOUT_MS) {
-      sessionStorage.removeItem('lv_admin_logged');
-      sessionStorage.removeItem('lv_admin_last_activity');
+  // Check with SERVER (not just local storage) if already logged in
+  DB.checkSession().then(function(res) {
+    if (res.success && res.loggedIn === true) {
+      showDashboard();
+    } else {
       document.getElementById('loginScreen').style.display = 'block';
       document.getElementById('adminDashboard').style.display = 'none';
-      clearLoginFields();
-      showToast('Session expired due to inactivity. Please login again.', true);
-    } else {
-      document.getElementById('loginScreen').style.display = 'none';
-      document.getElementById('adminDashboard').style.display = 'block';
-      initAdminDashboard();
-      startIdleWatcher();
     }
-  }
+  });
 });
