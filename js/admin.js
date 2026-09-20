@@ -1,5 +1,5 @@
-var ADMIN_USERNAME = "admin";
-var ADMIN_PASSWORD = "admin123";
+var ADMIN_USERNAME = "laptop-valley@outlook.com";
+var ADMIN_PASSWORD = "Hasan@Admin2529";
 
 function showToast(msg, isError) {
   var toast = document.getElementById('toast');
