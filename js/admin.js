@@ -195,6 +195,21 @@ function renderLaptopTable() {
   tbody.innerHTML = html;
 }
 
+// ---- HELPER: Get badge color class for each status ----
+function getStatusClass(status) {
+  if (status === 'confirmed') return 'badge-confirmed';
+  if (status === 'declined') return 'badge-declined';
+  if (status === 'refund') return 'badge-refund';
+  return 'badge-pending';
+}
+
+function getStatusLabel(status) {
+  if (status === 'confirmed') return 'Confirmed';
+  if (status === 'declined') return 'Declined';
+  if (status === 'refund') return 'Refund';
+  return 'Pending';
+}
+
 function renderOrdersTable() {
   var orders = getOrders();
   var tbody = document.getElementById('ordersTableBody');
@@ -208,6 +223,7 @@ function renderOrdersTable() {
   var html = '';
   for (var i = 0; i < orders.length; i++) {
     var order = orders[i];
+    var currentStatus = order.status || 'pending';
     var itemsHtml = '';
     for (var j = 0; j < order.items.length; j++) {
       itemsHtml += order.items[j].name + ' x' + order.items[j].qty + '<br>';
@@ -219,16 +235,75 @@ function renderOrdersTable() {
     html += '<td>' + itemsHtml + '</td>';
     html += '<td>' + formatPrice(order.total) + '</td>';
     html += '<td>' + order.paymentMethod + '</td>';
-    html += '<td><span class="badge ' + (order.status === 'confirmed' ? 'badge-confirmed' : 'badge-pending') + '">' + order.status + '</span></td>';
+    html += '<td><span id="statusBadge-' + order.id + '" class="badge ' + getStatusClass(currentStatus) + '">' + getStatusLabel(currentStatus) + '</span></td>';
     html += '<td><div class="action-btns">';
-    if (order.status === 'pending') {
-      html += '<button type="button" class="btn btn-success icon-btn" onclick="confirmOrder(\'' + order.id + '\')">Confirm</button>';
-    }
+    html += '<select class="status-dropdown" onchange="changeOrderStatus(\'' + order.id + '\', this.value)" data-current="' + currentStatus + '">';
+    html += '<option value="pending"' + (currentStatus === 'pending' ? ' selected' : '') + '>Pending</option>';
+    html += '<option value="confirmed"' + (currentStatus === 'confirmed' ? ' selected' : '') + '>Confirmed</option>';
+    html += '<option value="declined"' + (currentStatus === 'declined' ? ' selected' : '') + '>Declined</option>';
+    html += '<option value="refund"' + (currentStatus === 'refund' ? ' selected' : '') + '>Refund</option>';
+    html += '</select>';
     html += '<button type="button" class="btn btn-outline icon-btn" onclick="printInvoice(\'' + order.id + '\')">Print Invoice</button>';
     html += '<button type="button" class="btn btn-danger icon-btn" onclick="deleteOrder(\'' + order.id + '\')">Delete</button>';
     html += '</div></td></tr>';
   }
   tbody.innerHTML = html;
+}
+
+// ---- CHANGE ORDER STATUS (with stock reversal for refund/declined) ----
+function changeOrderStatus(orderId, newStatus) {
+  var validStatuses = ['pending', 'confirmed', 'declined', 'refund'];
+  if (validStatuses.indexOf(newStatus) === -1) return;
+
+  var orders = getOrders();
+  var oldStatus = '';
+  var order = null;
+  for (var i = 0; i < orders.length; i++) {
+    if (orders[i].id === orderId) {
+      oldStatus = orders[i].status || 'pending';
+      orders[i].status = newStatus;
+      order = orders[i];
+    }
+  }
+
+  // If order was previously active (pending/confirmed) and is now being refunded or declined,
+  // restore the stock back to inventory
+  var shouldRestoreStock =
+    (oldStatus === 'pending' || oldStatus === 'confirmed') &&
+    (newStatus === 'refund' || newStatus === 'declined');
+
+  // If order was previously refund/declined and is being moved back to active (pending/confirmed),
+  // deduct stock again
+  var shouldDeductStock =
+    (oldStatus === 'refund' || oldStatus === 'declined') &&
+    (newStatus === 'pending' || newStatus === 'confirmed');
+
+  if (shouldRestoreStock) {
+    var laptops = getLaptops();
+    for (var k = 0; k < laptops.length; k++) {
+      for (var m = 0; m < order.items.length; m++) {
+        if (laptops[k].model === order.items[m].name) {
+          laptops[k].stock += order.items[m].qty;
+        }
+      }
+    }
+    saveLaptops(laptops);
+  } else if (shouldDeductStock) {
+    var laptops2 = getLaptops();
+    for (var k2 = 0; k2 < laptops2.length; k2++) {
+      for (var m2 = 0; m2 < order.items.length; m2++) {
+        if (laptops2[k2].model === order.items[m2].name) {
+          laptops2[k2].stock = Math.max(0, laptops2[k2].stock - order.items[m2].qty);
+        }
+      }
+    }
+    saveLaptops(laptops2);
+  }
+
+  saveOrders(orders);
+  renderOrdersTable();
+  updateStats();
+  showToast('Order status updated to ' + getStatusLabel(newStatus));
 }
 
 function deleteOrder(orderId) {
@@ -245,14 +320,7 @@ function deleteOrder(orderId) {
   updateStats();
   showToast('Order deleted successfully');
 }
-function confirmOrder(orderId) {
-  updateOrderStatus(orderId, 'confirmed');
-  renderOrdersTable();
-  updateStats();
-  showToast('Order marked as confirmed');
-}
 
-// ---- PRINT INVOICE ----
 function printInvoice(orderId) {
   var orders = getOrders();
   var order = null;
@@ -262,6 +330,27 @@ function printInvoice(orderId) {
   if (!order) {
     showToast('Order not found', true);
     return;
+  }
+
+  var currentStatus = order.status || 'pending';
+
+  // Map status to color scheme for invoice
+  var statusColor = '#fef3c7';
+  var statusTextColor = '#92400e';
+  var statusLabel = 'Pending';
+
+  if (currentStatus === 'confirmed') {
+    statusColor = '#dcfce7';
+    statusTextColor = '#166534';
+    statusLabel = 'Confirmed';
+  } else if (currentStatus === 'declined') {
+    statusColor = '#fee2e2';
+    statusTextColor = '#991b1b';
+    statusLabel = 'Declined';
+  } else if (currentStatus === 'refund') {
+    statusColor = '#fef3c7';
+    statusTextColor = '#92400e';
+    statusLabel = 'Refund';
   }
 
   var itemsRows = '';
@@ -275,9 +364,6 @@ function printInvoice(orderId) {
       '<td style="text-align:right;">' + formatPrice(it.subtotal) + '</td>' +
       '</tr>';
   }
-
-  var statusColor = order.status === 'confirmed' ? '#dcfce7' : '#fef3c7';
-  var statusTextColor = order.status === 'confirmed' ? '#166534' : '#92400e';
 
   var invoiceHtml = '<!DOCTYPE html><html><head><title>Invoice ' + order.id + '</title>' +
     '<style>' +
@@ -314,7 +400,7 @@ function printInvoice(orderId) {
     '<div class="info-block" style="text-align:right;">' +
     '<h4>Payment Info</h4>' +
     '<p>Method: ' + order.paymentMethod + '</p>' +
-    '<p>Status: <span class="status-badge">' + order.status + '</span></p>' +
+    '<p>Status: <span class="status-badge">' + statusLabel + '</span></p>' +
     (order.notes ? '<p style="margin-top:8px;">Notes: ' + order.notes + '</p>' : '') +
     '</div>' +
     '</div>' +
@@ -355,7 +441,10 @@ function updateStats() {
   var revenue = 0;
   for (var i = 0; i < orders.length; i++) {
     if (orders[i].status === 'pending') pending++;
-    revenue += orders[i].total;
+    // Only count revenue from active orders (not declined or refunded)
+    if (orders[i].status !== 'declined' && orders[i].status !== 'refund') {
+      revenue += orders[i].total;
+    }
   }
 
   document.getElementById('statLaptops').textContent = laptops.length;
