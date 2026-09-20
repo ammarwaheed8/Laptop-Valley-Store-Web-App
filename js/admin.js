@@ -1,7 +1,6 @@
 var ADMIN_USERNAME = "laptop-valley@outlook.com";
 var ADMIN_PASSWORD = "Hasan@Admin2529";
 
-// ---- AUTO LOGOUT / IDLE TIMEOUT SETTINGS ----
 // var IDLE_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
 var IDLE_TIMEOUT_MS = 15 * 1000; // 15 seconds - FOR TESTING ONLY
 var IDLE_CHECK_INTERVAL_MS = 10 * 1000; // check every 10 seconds
@@ -24,7 +23,6 @@ function isAdminLoggedIn() {
 function updateLastActivity() {
   if (!isAdminLoggedIn()) return;
   var now = Date.now();
-  // Throttle writes to sessionStorage - only write once every 2 seconds max
   if (now - lastActivityWriteTime > 2000) {
     sessionStorage.setItem('lv_admin_last_activity', now.toString());
     lastActivityWriteTime = now;
@@ -36,7 +34,6 @@ function checkIdleTimeout() {
 
   var last = parseInt(sessionStorage.getItem('lv_admin_last_activity') || '0', 10);
   if (!last) {
-    // Safety fallback - if no timestamp exists yet, set it now
     sessionStorage.setItem('lv_admin_last_activity', Date.now().toString());
     return;
   }
@@ -47,6 +44,21 @@ function checkIdleTimeout() {
   if (elapsed >= IDLE_TIMEOUT_MS) {
     autoLogoutDueToInactivity();
   }
+}
+
+// ---- Clears login form fields (username + password) ----
+function clearLoginFields() {
+  var userEl = document.getElementById('adminUser');
+  var passEl = document.getElementById('adminPass');
+  if (userEl) userEl.value = '';
+  if (passEl) passEl.value = '';
+
+  // Also reset the eye icon back to "hidden" state
+  var eyeOpen = document.getElementById('eyeOpen');
+  var eyeClosed = document.getElementById('eyeClosed');
+  if (passEl) passEl.type = 'password';
+  if (eyeOpen) eyeOpen.style.display = 'block';
+  if (eyeClosed) eyeClosed.style.display = 'none';
 }
 
 function autoLogoutDueToInactivity() {
@@ -66,33 +78,29 @@ function autoLogoutDueToInactivity() {
   var loginError = document.getElementById('loginError');
   if (loginError) loginError.style.display = 'none';
 
+  clearLoginFields();
+
   showToast('Session expired due to inactivity. Please login again.', true);
 }
 
 function startIdleWatcher() {
-  // Set initial activity timestamp
   sessionStorage.setItem('lv_admin_last_activity', Date.now().toString());
   lastActivityWriteTime = Date.now();
 
-  // Activity events that reset the idle timer
   var activityEvents = ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart', 'click'];
   for (var i = 0; i < activityEvents.length; i++) {
     document.addEventListener(activityEvents[i], updateLastActivity, true);
   }
 
-  // Periodic check for idle timeout
   if (idleCheckTimer) clearInterval(idleCheckTimer);
   idleCheckTimer = setInterval(checkIdleTimeout, IDLE_CHECK_INTERVAL_MS);
 
-  // Also check immediately when tab becomes visible again
-  // (covers case where admin switched to another tab / browsed the store for a long time)
   document.addEventListener('visibilitychange', function() {
     if (document.visibilityState === 'visible') {
       checkIdleTimeout();
     }
   });
 
-  // Also check on window focus (extra safety net across browsers)
   window.addEventListener('focus', function() {
     checkIdleTimeout();
   });
@@ -131,6 +139,7 @@ function doLogout() {
   sessionStorage.removeItem('lv_admin_logged');
   sessionStorage.removeItem('lv_admin_last_activity');
   stopIdleWatcher();
+  clearLoginFields();
   location.reload();
 }
 
@@ -594,18 +603,16 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
 
-  // Check if already logged in (e.g., page refresh)
   if (isAdminLoggedIn()) {
-    // Verify session hasn't already expired while page was reloading
     var lastActivity = parseInt(sessionStorage.getItem('lv_admin_last_activity') || '0', 10);
     var now = Date.now();
 
     if (lastActivity && (now - lastActivity) >= IDLE_TIMEOUT_MS) {
-      // Session already expired, force logout view
       sessionStorage.removeItem('lv_admin_logged');
       sessionStorage.removeItem('lv_admin_last_activity');
       document.getElementById('loginScreen').style.display = 'block';
       document.getElementById('adminDashboard').style.display = 'none';
+      clearLoginFields();
       showToast('Session expired due to inactivity. Please login again.', true);
     } else {
       document.getElementById('loginScreen').style.display = 'none';
