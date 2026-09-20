@@ -1,5 +1,5 @@
 var ADMIN_USERNAME = "laptop-valley@outlook.com";
-var ADMIN_PASSWORD = "Hasan@Admin2529";
+var ADMIN_PASSWORD = "Hasan@admin2529";
 
 // var IDLE_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
 var IDLE_TIMEOUT_MS = 15 * 1000; // 15 seconds - FOR TESTING ONLY
