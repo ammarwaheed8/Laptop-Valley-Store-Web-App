@@ -359,6 +359,25 @@ document.addEventListener('DOMContentLoaded', function() {
   var loginBtn = document.getElementById('loginBtn');
   if (loginBtn) loginBtn.addEventListener('click', doLogin);
 
+  var toggleEye = document.getElementById('togglePassEye');
+  var passField = document.getElementById('adminPass');
+  var eyeOpen = document.getElementById('eyeOpen');
+  var eyeClosed = document.getElementById('eyeClosed');
+
+  if (toggleEye && passField) {
+    toggleEye.addEventListener('click', function() {
+      if (passField.type === 'password') {
+        passField.type = 'text';
+        eyeOpen.style.display = 'none';
+        eyeClosed.style.display = 'block';
+      } else {
+        passField.type = 'password';
+        eyeOpen.style.display = 'block';
+        eyeClosed.style.display = 'none';
+      }
+    });
+  }
+
   var logoutBtn = document.getElementById('logoutBtn');
   if (logoutBtn) logoutBtn.addEventListener('click', doLogout);
 
