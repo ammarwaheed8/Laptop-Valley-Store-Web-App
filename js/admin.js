@@ -225,11 +225,26 @@ function renderOrdersTable() {
       html += '<button type="button" class="btn btn-success icon-btn" onclick="confirmOrder(\'' + order.id + '\')">Confirm</button>';
     }
     html += '<button type="button" class="btn btn-outline icon-btn" onclick="printInvoice(\'' + order.id + '\')">Print Invoice</button>';
+    html += '<button type="button" class="btn btn-danger icon-btn" onclick="deleteOrder(\'' + order.id + '\')">Delete</button>';
     html += '</div></td></tr>';
   }
   tbody.innerHTML = html;
 }
 
+function deleteOrder(orderId) {
+  if (!confirm('Are you sure you want to delete this order? This action cannot be undone.')) {
+    return;
+  }
+  var orders = getOrders();
+  var filtered = [];
+  for (var i = 0; i < orders.length; i++) {
+    if (orders[i].id !== orderId) filtered.push(orders[i]);
+  }
+  saveOrders(filtered);
+  renderOrdersTable();
+  updateStats();
+  showToast('Order deleted successfully');
+}
 function confirmOrder(orderId) {
   updateOrderStatus(orderId, 'confirmed');
   renderOrdersTable();
