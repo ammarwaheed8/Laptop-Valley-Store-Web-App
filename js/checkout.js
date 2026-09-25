@@ -16,7 +16,7 @@ function renderOrderSummary() {
   var container = document.getElementById('orderItemsSummary');
 
   if (cart.length === 0) {
-    window.location.href = 'index.html';
+    window.location.href = 'index.html#store';
     return;
   }
 
@@ -138,7 +138,7 @@ function showOrderSuccess(orderId, orderData, emailFailed) {
   if (emailFailed) {
     html += '<p style="color:#ef4444; font-size:0.85rem;">Note: Confirmation email may be delayed, but your order is safely saved in the server database.</p>';
   }
-  html += '<a href="index.html" class="btn btn-primary" style="margin-top:15px; display:inline-block;">Continue Shopping</a>';
+  html += '<a href="index.html#store" class="btn btn-primary" style="margin-top:15px; display:inline-block;">Continue Shopping</a>';
   html += '</div>';
   wrapper.innerHTML = html;
 }
