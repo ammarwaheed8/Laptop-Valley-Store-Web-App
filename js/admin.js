@@ -1,6 +1,20 @@
 var idleCheckTimer = null;
 var heartbeatTimer = null;
 
+// Escapes a value for safe insertion into innerHTML (text content or inside a
+// quoted HTML attribute). Used on every customer-supplied field (order data,
+// item names) before it's built into HTML strings, so a malicious order can't
+// run script in the admin's browser (stored XSS).
+function escapeHtml(value) {
+  if (value === null || value === undefined) return '';
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function showToast(msg, isError) {
   var toast = document.getElementById('toast');
   if (!toast) return;
@@ -160,8 +174,8 @@ function submitChangePassword() {
     errorEl.style.display = 'block';
     return;
   }
-  if (newPass.length < 6) {
-    errorEl.textContent = 'New password must be at least 6 characters';
+  if (newPass.length < 8) {
+    errorEl.textContent = 'New password must be at least 8 characters';
     errorEl.style.display = 'block';
     return;
   }
@@ -193,16 +207,143 @@ function switchTab(tabName, btnEl) {
   if (tabName === 'orders') renderOrdersTable();
 }
 
+function renderCurrentImageSlots(lp) {
+  var panel = document.getElementById('currentImagesPanel');
+  var images = getLaptopImages(lp);
+  for (var i = 1; i <= 3; i++) {
+    var removeBox = document.getElementById('f_remove' + i);
+    if (removeBox) {
+      removeBox.checked = false;
+      removeBox.disabled = !images[i - 1];
+    }
+  }
+
+  if (!panel) return;
+  if (!images.length) {
+    panel.style.display = 'none';
+    panel.innerHTML = '';
+    return;
+  }
+
+  var html = '<div class="current-images-title">Current Images</div><div class="current-images-grid">';
+  for (var j = 0; j < images.length; j++) {
+    html += '<div class="current-image-card">';
+    html += '<img src="' + escapeHtml(images[j]) + '" alt="Current laptop image ' + (j + 1) + '" onerror="this.src=\'assets/laptop-placeholder.svg\'">';
+    html += '<span>Image ' + (j + 1) + '</span>';
+    html += '</div>';
+  }
+  html += '</div><p class="image-help-text">Upload a new file in a slot to replace that image, or tick Remove existing image. Leave a slot untouched to keep its current image.</p>';
+  panel.innerHTML = html;
+  panel.style.display = 'block';
+}
+
+function resetImageFields() {
+  for (var i = 1; i <= 3; i++) {
+    var input = document.getElementById('f_image' + i);
+    var removeBox = document.getElementById('f_remove' + i);
+    if (input) input.value = '';
+    if (removeBox) {
+      removeBox.checked = false;
+      removeBox.disabled = true;
+    }
+  }
+  var panel = document.getElementById('currentImagesPanel');
+  if (panel) {
+    panel.style.display = 'none';
+    panel.innerHTML = '';
+  }
+}
+
+var LAPTOP_ONLY_FIELDS = ['f_procBrand','f_procModel','f_ramSize','f_ramType','f_storageType','f_storageCap','f_displaySize','f_displayRes','f_displayType','f_graphics','f_os','f_battery','f_weight','f_color'];
+var DESKTOP_ONLY_FIELDS = ['f_desktopProcBrand','f_desktopProcModel','f_desktopRamSize','f_desktopRamType','f_desktopStorageType','f_desktopStorageCap','f_desktopGraphics','f_desktopMotherboard','f_desktopPsu','f_desktopCaseType','f_desktopCooling','f_desktopOs'];
+var LAPTOP_SUBCATEGORY_VALUES = ['Laptop'];
+var DESKTOP_SUBCATEGORY_VALUES = ['Gaming PC','Office PC','Workstation','Mini PC','All-in-One PC','Custom Build','Other Desktop'];
+var ACCESSORY_SUBCATEGORY_VALUES = ['Mouse','Keyboard','Headset','Laptop Bag','Charger / Adapter','Cooling Pad','Dock / Hub','Storage','RAM / Memory','Monitor','Cable','Other'];
+
+function setFieldState(ids, enabled, required) {
+  for (var i = 0; i < ids.length; i++) {
+    var field = document.getElementById(ids[i]);
+    if (!field) continue;
+    field.disabled = !enabled;
+    field.required = !!required && enabled;
+  }
+}
+
+function selectSubcategoryForCategory(category, desired) {
+  var select = document.getElementById('f_subcategory');
+  if (!select) return;
+  var allowed = category === 'Laptop' ? LAPTOP_SUBCATEGORY_VALUES : (category === 'Desktop PC' ? DESKTOP_SUBCATEGORY_VALUES : ACCESSORY_SUBCATEGORY_VALUES);
+  for (var i = 0; i < select.options.length; i++) {
+    var option = select.options[i];
+    var isAllowed = allowed.indexOf(option.value) !== -1;
+    option.style.display = isAllowed ? '' : 'none';
+  }
+  if (desired && allowed.indexOf(desired) !== -1) {
+    select.value = desired;
+  } else if (allowed.length) {
+    select.value = allowed[0];
+  } else {
+    select.value = '';
+  }
+}
+
+function syncProductFormMode() {
+  var categoryEl = document.getElementById('f_category');
+  var category = categoryEl ? categoryEl.value : 'Laptop';
+  var laptopMode = category === 'Laptop';
+  var desktopMode = category === 'Desktop PC';
+  var accessoryMode = category === 'Accessories';
+
+  var laptopWrap = document.getElementById('laptopSpecsFields');
+  var desktopWrap = document.getElementById('desktopSpecsFields');
+  if (laptopWrap) laptopWrap.style.display = laptopMode ? 'block' : 'none';
+  if (desktopWrap) desktopWrap.style.display = desktopMode ? 'block' : 'none';
+
+  setFieldState(LAPTOP_ONLY_FIELDS, laptopMode, laptopMode);
+  setFieldState(DESKTOP_ONLY_FIELDS, desktopMode, desktopMode);
+
+  selectSubcategoryForCategory(category, document.getElementById('f_subcategory') ? document.getElementById('f_subcategory').value : '');
+
+  var heading = document.querySelector('#tab-add h2');
+  if (heading) heading.textContent = laptopMode ? 'Add New Laptop' : (desktopMode ? 'Add New Desktop PC' : 'Add New Accessory');
+  var submitBtn = document.getElementById('submitBtn');
+  var editId = document.getElementById('f_editId');
+  if (submitBtn && !(editId && editId.value)) {
+    submitBtn.textContent = laptopMode ? 'Add Laptop' : (desktopMode ? 'Add Desktop PC' : 'Add Accessory');
+  }
+}
+
+function validateProductBeforeSubmit(category) {
+  var requiredIds = category === 'Laptop' ? LAPTOP_ONLY_FIELDS : (category === 'Desktop PC' ? DESKTOP_ONLY_FIELDS : []);
+  for (var i = 0; i < requiredIds.length; i++) {
+    var field = document.getElementById(requiredIds[i]);
+    if (field && !field.disabled && !String(field.value || '').trim()) {
+      showToast('Please complete all ' + (category === 'Desktop PC' ? 'Desktop PC' : 'laptop') + ' specifications before saving.', true);
+      field.focus();
+      return false;
+    }
+  }
+  return true;
+}
+
 function resetForm() {
   document.getElementById('laptopForm').reset();
   document.getElementById('f_editId').value = '';
-  document.getElementById('submitBtn').textContent = 'Add Laptop';
+  document.getElementById('f_category').value = 'Laptop';
+  document.getElementById('f_subcategory').value = 'Laptop';
+  resetImageFields();
+  syncProductFormMode();
 }
 
 function handleLaptopSubmit(e) {
   e.preventDefault();
 
+  var category = document.getElementById('f_category').value;
+  if (!validateProductBeforeSubmit(category)) return;
+
   var laptopData = {
+    category: category,
+    subcategory: document.getElementById('f_subcategory').value,
     brand: document.getElementById('f_brand').value,
     model: document.getElementById('f_model').value,
     processorBrand: document.getElementById('f_procBrand').value,
@@ -219,19 +360,46 @@ function handleLaptopSubmit(e) {
     battery: document.getElementById('f_battery').value,
     weight: document.getElementById('f_weight').value,
     color: document.getElementById('f_color').value,
+    desktopProcessorBrand: document.getElementById('f_desktopProcBrand').value,
+    desktopProcessorModel: document.getElementById('f_desktopProcModel').value,
+    desktopRamSize: document.getElementById('f_desktopRamSize').value,
+    desktopRamType: document.getElementById('f_desktopRamType').value,
+    desktopStorageType: document.getElementById('f_desktopStorageType').value,
+    desktopStorageCapacity: document.getElementById('f_desktopStorageCap').value,
+    desktopGraphics: document.getElementById('f_desktopGraphics').value,
+    desktopMotherboard: document.getElementById('f_desktopMotherboard').value,
+    desktopPsu: document.getElementById('f_desktopPsu').value,
+    desktopCaseType: document.getElementById('f_desktopCaseType').value,
+    desktopCooling: document.getElementById('f_desktopCooling').value,
+    desktopOs: document.getElementById('f_desktopOs').value,
     warranty: document.getElementById('f_warranty').value,
     price: Number(document.getElementById('f_price').value),
     stock: Number(document.getElementById('f_stock').value),
-    image: document.getElementById('f_image').value,
     description: document.getElementById('f_description').value
   };
+
+  var imageFiles = {};
+  var removeImages = {};
+  for (var i = 1; i <= 3; i++) {
+    var input = document.getElementById('f_image' + i);
+    var removeBox = document.getElementById('f_remove' + i);
+    if (input && input.files && input.files[0]) imageFiles['image' + i] = input.files[0];
+    if (removeBox && removeBox.checked) removeImages['remove' + i] = true;
+  }
 
   var editId = document.getElementById('f_editId').value;
   if (editId) laptopData.id = editId;
 
-  DB.saveLaptop(laptopData).then(function(res) {
+  var submitBtn = document.getElementById('submitBtn');
+  submitBtn.disabled = true;
+  submitBtn.textContent = editId ? 'Updating...' : 'Adding...';
+
+  DB.saveLaptop(laptopData, imageFiles, removeImages).then(function(res) {
+    submitBtn.disabled = false;
+    submitBtn.textContent = editId ? 'Update Product' : (category === 'Laptop' ? 'Add Laptop' : (category === 'Desktop PC' ? 'Add Desktop PC' : 'Add Accessory'));
+
     if (res.success) {
-      showToast(editId ? 'Laptop updated successfully' : 'Laptop added successfully');
+      showToast(editId ? 'Product updated successfully' : (category === 'Laptop' ? 'Laptop added successfully' : (category === 'Desktop PC' ? 'Desktop PC added successfully' : 'Accessory added successfully')));
       resetForm();
       DB.fetchLaptops().then(function() {
         renderLaptopTable();
@@ -240,8 +408,12 @@ function handleLaptopSubmit(e) {
     } else if (res.error === 'Unauthorized. Please login as admin.') {
       showLoginScreen('Session expired. Please login again.');
     } else {
-      showToast('Error saving laptop', true);
+      showToast(res.error ? ('Error saving laptop: ' + res.error) : 'Error saving laptop', true);
     }
+  }).catch(function(err) {
+    submitBtn.disabled = false;
+    submitBtn.textContent = editId ? 'Update Product' : (category === 'Laptop' ? 'Add Laptop' : (category === 'Desktop PC' ? 'Add Desktop PC' : 'Add Accessory'));
+    showToast(err.message || 'Error saving laptop', true);
   });
 }
 
@@ -249,6 +421,8 @@ function editLaptop(id) {
   var lp = getLaptopById(id);
   if (!lp) return;
 
+  document.getElementById('f_category').value = lp.category || 'Laptop';
+  document.getElementById('f_subcategory').value = lp.subcategory || ((lp.category || 'Laptop') === 'Laptop' ? 'Laptop' : 'Other');
   document.getElementById('f_brand').value = lp.brand;
   document.getElementById('f_model').value = lp.model;
   document.getElementById('f_procBrand').value = lp.processorBrand;
@@ -264,14 +438,32 @@ function editLaptop(id) {
   document.getElementById('f_os').value = lp.os;
   document.getElementById('f_battery').value = lp.battery;
   document.getElementById('f_weight').value = lp.weight;
-  document.getElementById('f_color').value = lp.color;
-  document.getElementById('f_warranty').value = lp.warranty;
+  document.getElementById('f_color').value = lp.color || '';
+  document.getElementById('f_desktopProcBrand').value = lp.desktopProcessorBrand || lp.processorBrand || '';
+  document.getElementById('f_desktopProcModel').value = lp.desktopProcessorModel || lp.processorModel || '';
+  document.getElementById('f_desktopRamSize').value = lp.desktopRamSize || lp.ramSize || '';
+  document.getElementById('f_desktopRamType').value = lp.desktopRamType || lp.ramType || '';
+  document.getElementById('f_desktopStorageType').value = lp.desktopStorageType || lp.storageType || '';
+  document.getElementById('f_desktopStorageCap').value = lp.desktopStorageCapacity || lp.storageCapacity || '';
+  document.getElementById('f_desktopGraphics').value = lp.desktopGraphics || lp.graphics || '';
+  document.getElementById('f_desktopMotherboard').value = lp.desktopMotherboard || '';
+  document.getElementById('f_desktopPsu').value = lp.desktopPsu || '';
+  document.getElementById('f_desktopCaseType').value = lp.desktopCaseType || '';
+  document.getElementById('f_desktopCooling').value = lp.desktopCooling || '';
+  document.getElementById('f_desktopOs').value = lp.desktopOs || lp.os || '';
+  document.getElementById('f_warranty').value = lp.warranty || '';
   document.getElementById('f_price').value = lp.price;
   document.getElementById('f_stock').value = lp.stock;
-  document.getElementById('f_image').value = lp.image;
   document.getElementById('f_description').value = lp.description || '';
   document.getElementById('f_editId').value = lp.id;
-  document.getElementById('submitBtn').textContent = 'Update Laptop';
+  document.getElementById('submitBtn').textContent = (lp.category === 'Accessories' ? 'Update Accessory' : (lp.category === 'Desktop PC' ? 'Update Desktop PC' : 'Update Laptop'));
+
+  for (var k = 1; k <= 3; k++) {
+    var fileInput = document.getElementById('f_image' + k);
+    if (fileInput) fileInput.value = '';
+  }
+  renderCurrentImageSlots(lp);
+  syncProductFormMode();
 
   var contents = document.querySelectorAll('.tab-content');
   for (var i = 0; i < contents.length; i++) contents[i].classList.remove('active');
@@ -286,13 +478,13 @@ function editLaptop(id) {
 }
 
 function deleteLaptopHandler(id) {
-  if (confirm('Are you sure you want to delete this laptop?')) {
+  if (confirm('Are you sure you want to delete this product?')) {
     DB.deleteLaptop(id).then(function(res) {
       if (res.success) {
         DB.fetchLaptops().then(function() {
           renderLaptopTable();
           updateStats();
-          showToast('Laptop deleted');
+          showToast('Product deleted');
         });
       } else if (res.error === 'Unauthorized. Please login as admin.') {
         showLoginScreen('Session expired. Please login again.');
@@ -302,28 +494,35 @@ function deleteLaptopHandler(id) {
 }
 
 function renderLaptopTable() {
-  var laptops = getLaptops();
+  var products = getLaptops();
   var tbody = document.getElementById('laptopTableBody');
   if (!tbody) return;
 
-  if (laptops.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:30px;">No laptops added yet.</td></tr>';
+  if (products.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:30px;">No products added yet.</td></tr>';
     return;
   }
 
   var html = '';
-  for (var i = 0; i < laptops.length; i++) {
-    var lp = laptops[i];
+  for (var i = 0; i < products.length; i++) {
+    var product = products[i];
+    var category = product.category || 'Laptop';
+    var specs = category === 'Laptop'
+      ? (escapeHtml(product.processorModel || '') + ', ' + escapeHtml(product.ramSize || '') + ', ' + escapeHtml(product.storageCapacity || ''))
+      : (category === 'Desktop PC'
+        ? (escapeHtml(product.desktopProcessorModel || product.processorModel || '') + ', ' + escapeHtml(product.desktopRamSize || product.ramSize || '') + ', ' + escapeHtml(product.desktopStorageCapacity || product.storageCapacity || '') + (product.desktopGraphics ? ', ' + escapeHtml(product.desktopGraphics) : ''))
+        : (escapeHtml(product.subcategory || 'Accessory')));
     html += '<tr>';
-    html += '<td><img src="' + lp.image + '" style="width:60px; height:45px; object-fit:contain;" onerror="this.src=\'https://via.placeholder.com/60x45\'"></td>';
-    html += '<td>' + lp.brand + '</td>';
-    html += '<td>' + lp.model + '</td>';
-    html += '<td>' + lp.processorModel + ', ' + lp.ramSize + ', ' + lp.storageCapacity + '</td>';
-    html += '<td>' + formatPrice(lp.price) + '</td>';
-    html += '<td><strong>' + lp.stock + '</strong></td>';
+    html += '<td><img src="' + escapeHtml(getLaptopPrimaryImage(product)) + '" style="width:60px; height:45px; object-fit:contain;" onerror="this.src=\'assets/laptop-placeholder.svg\'"></td>';
+    html += '<td>' + escapeHtml(category) + '</td>';
+    html += '<td>' + escapeHtml(product.brand) + '</td>';
+    html += '<td>' + escapeHtml(product.model) + '</td>';
+    html += '<td>' + specs + '</td>';
+    html += '<td>' + formatPrice(product.price) + '</td>';
+    html += '<td><strong>' + escapeHtml(product.stock) + '</strong></td>';
     html += '<td><div class="action-btns">';
-    html += '<button type="button" class="btn btn-outline icon-btn" onclick="editLaptop(\'' + lp.id + '\')">Edit</button>';
-    html += '<button type="button" class="btn btn-danger icon-btn" onclick="deleteLaptopHandler(\'' + lp.id + '\')">Delete</button>';
+    html += '<button type="button" class="btn btn-outline icon-btn" onclick="editLaptop(\'' + escapeHtml(product.id) + '\')">Edit</button>';
+    html += '<button type="button" class="btn btn-danger icon-btn" onclick="deleteLaptopHandler(\'' + escapeHtml(product.id) + '\')">Delete</button>';
     html += '</div></td></tr>';
   }
   tbody.innerHTML = html;
@@ -362,25 +561,25 @@ function renderOrdersTable() {
       var currentStatus = order.status || 'pending';
       var itemsHtml = '';
       for (var j = 0; j < order.items.length; j++) {
-        itemsHtml += order.items[j].name + ' x' + order.items[j].qty + '<br>';
+        itemsHtml += escapeHtml(order.items[j].name) + ' x' + escapeHtml(order.items[j].qty) + '<br>';
       }
       html += '<tr>';
-      html += '<td>' + order.id + '</td>';
-      html += '<td>' + order.customerName + '</td>';
-      html += '<td>' + order.customerPhone + '<br><small>' + order.customerEmail + '</small></td>';
+      html += '<td>' + escapeHtml(order.id) + '</td>';
+      html += '<td>' + escapeHtml(order.customerName) + '</td>';
+      html += '<td>' + escapeHtml(order.customerPhone) + '<br><small>' + escapeHtml(order.customerEmail) + '</small></td>';
       html += '<td>' + itemsHtml + '</td>';
       html += '<td>' + formatPrice(order.total) + '</td>';
-      html += '<td>' + order.paymentMethod + '</td>';
+      html += '<td>' + escapeHtml(order.paymentMethod) + '</td>';
       html += '<td><span class="badge ' + getStatusClass(currentStatus) + '">' + getStatusLabel(currentStatus) + '</span></td>';
       html += '<td><div class="action-btns">';
-      html += '<select class="status-dropdown" onchange="changeOrderStatus(\'' + order.id + '\', this.value)" data-current="' + currentStatus + '">';
+      html += '<select class="status-dropdown" onchange="changeOrderStatus(\'' + escapeHtml(order.id) + '\', this.value)" data-current="' + escapeHtml(currentStatus) + '">';
       html += '<option value="pending"' + (currentStatus === 'pending' ? ' selected' : '') + '>Pending</option>';
       html += '<option value="confirmed"' + (currentStatus === 'confirmed' ? ' selected' : '') + '>Confirmed</option>';
       html += '<option value="declined"' + (currentStatus === 'declined' ? ' selected' : '') + '>Declined</option>';
       html += '<option value="refund"' + (currentStatus === 'refund' ? ' selected' : '') + '>Refund</option>';
       html += '</select>';
-      html += '<button type="button" class="btn btn-outline icon-btn" onclick="printInvoice(\'' + order.id + '\')">Print Invoice</button>';
-      html += '<button type="button" class="btn btn-danger icon-btn" onclick="deleteOrderHandler(\'' + order.id + '\')">Delete</button>';
+      html += '<button type="button" class="btn btn-outline icon-btn" onclick="printInvoice(\'' + escapeHtml(order.id) + '\')">Print Invoice</button>';
+      html += '<button type="button" class="btn btn-danger icon-btn" onclick="deleteOrderHandler(\'' + escapeHtml(order.id) + '\')">Delete</button>';
       html += '</div></td></tr>';
     }
     tbody.innerHTML = html;
@@ -399,7 +598,7 @@ function changeOrderStatus(orderId, newStatus) {
     } else if (res.error === 'Unauthorized. Please login as admin.') {
       showLoginScreen('Session expired. Please login again.');
     } else {
-      showToast('Failed to update status', true);
+      showToast(res.error ? ('Failed to update status: ' + res.error) : 'Failed to update status', true);
     }
   });
 }
@@ -445,14 +644,14 @@ function printInvoice(orderId) {
     var it = order.items[j];
     itemsRows += '<tr>' +
       '<td>' + (j + 1) + '</td>' +
-      '<td>' + it.name + ' (' + it.brand + ')</td>' +
-      '<td style="text-align:center;">' + it.qty + '</td>' +
+      '<td>' + escapeHtml(it.name) + (it.brand ? ' (' + escapeHtml(it.brand) + ')' : '') + '</td>' +
+      '<td style="text-align:center;">' + escapeHtml(it.qty) + '</td>' +
       '<td style="text-align:right;">' + formatPrice(it.price) + '</td>' +
       '<td style="text-align:right;">' + formatPrice(it.subtotal) + '</td>' +
       '</tr>';
   }
 
-  var invoiceHtml = '<!DOCTYPE html><html><head><title>Invoice ' + order.id + '</title>' +
+  var invoiceHtml = '<!DOCTYPE html><html><head><title>Invoice ' + escapeHtml(order.id) + '</title>' +
     '<style>' +
     'body{font-family:Arial, sans-serif; padding:40px; color:#1e293b;}' +
     '.invoice-header{display:flex; justify-content:space-between; align-items:flex-start; border-bottom:3px solid #1e40af; padding-bottom:20px; margin-bottom:20px;}' +
@@ -470,23 +669,23 @@ function printInvoice(orderId) {
     '@media print { body{padding:20px;} }' +
     '</style></head><body>' +
     '<div class="invoice-header">' +
-    '<div><div class="company-name">Laptop Valley</div><p style="color:#64748b; font-size:0.85rem;">Premium Laptop Store - Pakistan</p></div>' +
-    '<div><div class="invoice-title">INVOICE</div><p style="color:#64748b; font-size:0.85rem;">Order ID: ' + order.id + '</p><p style="color:#64748b; font-size:0.85rem;">Date: ' + new Date(order.date).toLocaleDateString() + '</p></div>' +
+    '<div><div class="company-name">Laptop Valley</div><p style="color:#64748b; font-size:0.85rem;">Pakistan`s Premium Laptop & Tech Store</p></div>' +
+    '<div><div class="invoice-title">INVOICE</div><p style="color:#64748b; font-size:0.85rem;">Order ID: ' + escapeHtml(order.id) + '</p><p style="color:#64748b; font-size:0.85rem;">Date: ' + new Date(order.date).toLocaleDateString() + '</p></div>' +
     '</div>' +
     '<div class="info-grid">' +
     '<div class="info-block">' +
     '<h4>Billed To</h4>' +
-    '<p><strong>' + order.customerName + '</strong></p>' +
-    '<p>' + order.address + '</p>' +
-    '<p>' + order.city + ' - ' + order.pin + '</p>' +
-    '<p>Phone: ' + order.customerPhone + '</p>' +
-    '<p>Email: ' + order.customerEmail + '</p>' +
+    '<p><strong>' + escapeHtml(order.customerName) + '</strong></p>' +
+    '<p>' + escapeHtml(order.address) + '</p>' +
+    '<p>' + escapeHtml(order.city) + ' - ' + escapeHtml(order.pin) + '</p>' +
+    '<p>Phone: ' + escapeHtml(order.customerPhone) + '</p>' +
+    '<p>Email: ' + escapeHtml(order.customerEmail) + '</p>' +
     '</div>' +
     '<div class="info-block" style="text-align:right;">' +
     '<h4>Payment Info</h4>' +
-    '<p>Method: ' + order.paymentMethod + '</p>' +
+    '<p>Method: ' + escapeHtml(order.paymentMethod) + '</p>' +
     '<p>Status: <span class="status-badge">' + statusLabel + '</span></p>' +
-    (order.notes ? '<p style="margin-top:8px;">Notes: ' + order.notes + '</p>' : '') +
+    (order.notes ? '<p style="margin-top:8px;">Notes: ' + escapeHtml(order.notes) + '</p>' : '') +
     '</div>' +
     '</div>' +
     '<table>' +
@@ -496,7 +695,7 @@ function printInvoice(orderId) {
     '<div class="total-row">Total Amount: ' + formatPrice(order.total) + '</div>' +
     '<div class="footer-note">' +
     '<p>Thank you for shopping with Laptop Valley!</p>' +
-    '<p>For queries, contact us at +92-300-1234567 or support@laptopvalley.pk</p>' +
+    '<p>For queries, contact us at +92-330-0002529, +92-302-1104868 or contact@laptopvalley.pk</p>' +
     '</div>' +
     '</body></html>';
 
@@ -538,6 +737,10 @@ function initAdminDashboard() {
     updateStats();
     renderLaptopTable();
     renderOrdersTable();
+  }).catch(function(err) {
+    console.error('Failed to load admin inventory:', err);
+    showToast(err.message || 'Could not load products from server.', true);
+    renderLaptopTable();
   });
 }
 
@@ -580,6 +783,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
   var laptopForm = document.getElementById('laptopForm');
   if (laptopForm) laptopForm.addEventListener('submit', handleLaptopSubmit);
+  syncProductFormMode();
 
   var passInput = document.getElementById('adminPass');
   if (passInput) {
