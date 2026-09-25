@@ -2,6 +2,7 @@ function updateCartBadge() {
   validateCart();
   var el = document.getElementById('cartCount');
   if (el) el.textContent = getCartCount();
+  window.dispatchEvent(new Event('cartUpdated'));
 }
 
 function toggleCart() {
@@ -37,7 +38,7 @@ function renderCartSidebar() {
     var atMaxStock = item.qty >= lp.stock;
 
     html += '<div class="cart-item">';
-    html += '<img src="' + lp.image + '" onerror="this.src=\'https://via.placeholder.com/70\'">';
+    html += '<img src="' + escapeStoreHtml(getLaptopPrimaryImage(lp)) + '" onerror="this.src=\'assets/laptop-placeholder.svg\'">';
     html += '<div class="cart-item-info">';
     html += '<h4>' + lp.model + '</h4>';
     html += '<div class="cart-item-price">' + formatPrice(lp.price) + '</div>';
