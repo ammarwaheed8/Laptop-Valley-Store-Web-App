@@ -4,13 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Admin Panel - Laptop Valley</title>
-<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/style.css?v=10">
+<link rel="shortcut icon" href="assets/favicon.png" type="image/x-icon">
 </head>
 <body class="admin-body">
 
 <div id="loginScreen" class="admin-login">
-  <a href="index.html" class="back-to-store-btn">Back to Store</a>
-  <h2 style="color:#1e40af; margin-bottom:5px;">Laptop Valley</h2>
+  <a href="index.html#home" class="back-to-store-btn">Back to Home</a>
+  <h2 style="color:#1e40af; margin-bottom:5px;">LAPTOP VALLEY</h2>
   <p style="color:#64748b; margin-bottom:25px;">Admin Panel Login</p>  <div class="form-group" style="text-align:left;">
     <label>Username</label>
     <input type="text" id="adminUser" placeholder="admin">
@@ -39,7 +40,7 @@
   <div class="admin-header">
     <div class="logo" style="color:white; font-size:1.4rem;">Laptop<span style="color:#60a5fa;">Valley</span> Admin</div>
     <div>
-      <a href="index.html" style="color:white; margin-right:20px;">View Store</a>
+      <a href="index.html#store" id="view-store-btn">View Store</a>
       <button type="button" class="btn btn-outline" style="color:white; border-color:white; margin-right:10px;" id="changePasswordBtn">Change Password</button>
       <button type="button" class="btn" style="background:#ef4444; color:white;" id="logoutBtn">Logout</button>
     </div>
@@ -48,7 +49,7 @@
   <div class="admin-container">
     <div class="stats-grid">
       <div class="stat-card">
-        <h4>Total Laptops</h4>
+        <h4>Total Products</h4>
         <div class="num" id="statLaptops">0</div>
       </div>
       <div class="stat-card">
@@ -66,41 +67,72 @@
     </div>
 
     <div class="admin-tabs">
-      <button type="button" class="tab-btn active" data-tab="add">Add Laptop</button>
-      <button type="button" class="tab-btn" data-tab="manage">Manage Laptops</button>
+      <button type="button" class="tab-btn active" data-tab="add">Add Product</button>
+      <button type="button" class="tab-btn" data-tab="manage">Manage Products</button>
       <button type="button" class="tab-btn" data-tab="orders">Orders</button>
     </div>
 
     <div id="tab-add" class="tab-content active">
       <div class="card">
-        <h2 style="color:#1e40af; margin-bottom:20px;">Add New Laptop</h2>
+        <h2 style="color:#1e40af; margin-bottom:20px;">Add New Product</h2>
         <form id="laptopForm">
           <div class="form-row">
             <div class="form-group">
-              <label>Brand *</label>
-              <select id="f_brand" required>
-                <option value="">Select Brand</option>
-                <option value="Dell">Dell</option>
-                <option value="HP">HP</option>
-                <option value="Lenovo">Lenovo</option>
-                <option value="ASUS">ASUS</option>
-                <option value="Apple">Apple</option>
-                <option value="Acer">Acer</option>
-                <option value="MSI">MSI</option>
-                <option value="Samsung">Samsung</option>
-                <option value="Microsoft">Microsoft</option>
+              <label>Category *</label>
+              <select id="f_category" required onchange="syncProductFormMode()">
+                <option value="Laptop">Laptop</option>
+                <option value="Accessories">Accessories</option>
+                <option value="Desktop PC">Desktop PC</option>
               </select>
             </div>
             <div class="form-group">
-              <label>Model Name *</label>
-              <input type="text" id="f_model" placeholder="e.g. XPS 15 9530" required>
+              <label>Subcategory</label>
+              <select id="f_subcategory">
+                <optgroup label="Laptop">
+                  <option value="Laptop">Laptop</option>
+                </optgroup>
+                <optgroup label="Desktop PC">
+                  <option value="Gaming PC">Gaming PC</option>
+                  <option value="Office PC">Office PC</option>
+                  <option value="Workstation">Workstation</option>
+                  <option value="Mini PC">Mini PC</option>
+                  <option value="All-in-One PC">All-in-One PC</option>
+                  <option value="Custom Build">Custom Build</option>
+                  <option value="Other Desktop">Other Desktop</option>
+                </optgroup>
+                <optgroup label="Accessories">
+                  <option value="Mouse">Mouse</option>
+                  <option value="Keyboard">Keyboard</option>
+                  <option value="Headset">Headset</option>
+                  <option value="Laptop Bag">Laptop Bag</option>
+                  <option value="Charger / Adapter">Charger / Adapter</option>
+                  <option value="Cooling Pad">Cooling Pad</option>
+                  <option value="Dock / Hub">Dock / Hub</option>
+                  <option value="Storage">Storage</option>
+                  <option value="RAM / Memory">RAM / Memory</option>
+                  <option value="Monitor">Monitor</option>
+                  <option value="Cable">Cable</option>
+                  <option value="Other">Other</option>
+                </optgroup>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Brand *</label>
+              <input type="text" id="f_brand" placeholder="e.g. Dell, Logitech, Anker" required>
+            </div>
+            <div class="form-group">
+              <label>Product Name / Model *</label>
+              <input type="text" id="f_model" placeholder="e.g. XPS 15 9530 / Logitech G102" required>
             </div>
           </div>
 
+          <div id="laptopSpecsFields">
           <div class="form-row">
             <div class="form-group">
               <label>Processor Brand *</label>
-              <select id="f_procBrand" required>
+              <select id="f_procBrand">
                 <option value="">Select</option>
                 <option value="Intel">Intel</option>
                 <option value="AMD">AMD</option>
@@ -110,14 +142,14 @@
             </div>
             <div class="form-group">
               <label>Processor Model *</label>
-              <input type="text" id="f_procModel" placeholder="e.g. Core i7-13700H" required>
+              <input type="text" id="f_procModel" placeholder="e.g. Core i7-13700H">
             </div>
           </div>
 
           <div class="form-row">
             <div class="form-group">
               <label>RAM Size *</label>
-              <select id="f_ramSize" required>
+              <select id="f_ramSize">
                 <option value="">Select</option>
                 <option value="4GB">4GB</option>
                 <option value="8GB">8GB</option>
@@ -128,7 +160,7 @@
             </div>
             <div class="form-group">
               <label>RAM Type *</label>
-              <select id="f_ramType" required>
+              <select id="f_ramType">
                 <option value="">Select</option>
                 <option value="DDR4">DDR4</option>
                 <option value="DDR5">DDR5</option>
@@ -142,7 +174,7 @@
           <div class="form-row">
             <div class="form-group">
               <label>Storage Type *</label>
-              <select id="f_storageType" required>
+              <select id="f_storageType">
                 <option value="">Select</option>
                 <option value="SSD">SSD</option>
                 <option value="HDD">HDD</option>
@@ -152,7 +184,7 @@
             </div>
             <div class="form-group">
               <label>Storage Capacity *</label>
-              <select id="f_storageCap" required>
+              <select id="f_storageCap">
                 <option value="">Select</option>
                 <option value="128GB">128GB</option>
                 <option value="256GB">256GB</option>
@@ -166,7 +198,7 @@
           <div class="form-row">
             <div class="form-group">
               <label>Display Size *</label>
-              <select id="f_displaySize" required>
+              <select id="f_displaySize">
                 <option value="">Select</option>
                 <option value="13.3 inch">13.3 inch</option>
                 <option value="13.6 inch">13.6 inch</option>
@@ -178,7 +210,7 @@
             </div>
             <div class="form-group">
               <label>Display Resolution *</label>
-              <select id="f_displayRes" required>
+              <select id="f_displayRes">
                 <option value="">Select</option>
                 <option value="HD 1366x768">HD 1366x768</option>
                 <option value="FHD 1920x1080">FHD 1920x1080</option>
@@ -193,7 +225,7 @@
           <div class="form-row">
             <div class="form-group">
               <label>Display Panel Type *</label>
-              <select id="f_displayType" required>
+              <select id="f_displayType">
                 <option value="">Select</option>
                 <option value="IPS">IPS</option>
                 <option value="OLED">OLED</option>
@@ -203,14 +235,14 @@
             </div>
             <div class="form-group">
               <label>Graphics Card *</label>
-              <input type="text" id="f_graphics" placeholder="e.g. NVIDIA RTX 4060 8GB" required>
+              <input type="text" id="f_graphics" placeholder="e.g. NVIDIA RTX 4060 8GB">
             </div>
           </div>
 
           <div class="form-row">
             <div class="form-group">
               <label>Operating System *</label>
-              <select id="f_os" required>
+              <select id="f_os">
                 <option value="">Select</option>
                 <option value="Windows 11 Home">Windows 11 Home</option>
                 <option value="Windows 11 Pro">Windows 11 Pro</option>
@@ -221,20 +253,127 @@
             </div>
             <div class="form-group">
               <label>Battery *</label>
-              <input type="text" id="f_battery" placeholder="e.g. 86Wh, up to 13 hrs" required>
+              <input type="text" id="f_battery" placeholder="e.g. 86Wh, up to 13 hrs">
             </div>
           </div>
 
           <div class="form-row">
             <div class="form-group">
               <label>Weight *</label>
-              <input type="text" id="f_weight" placeholder="e.g. 1.86 kg" required>
+              <input type="text" id="f_weight" placeholder="e.g. 1.86 kg">
             </div>
             <div class="form-group">
               <label>Color *</label>
-              <input type="text" id="f_color" placeholder="e.g. Platinum Silver" required>
+              <input type="text" id="f_color" placeholder="e.g. Platinum Silver">
             </div>
           </div>
+          </div>
+
+          <div id="desktopSpecsFields" style="display:none;">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Processor Brand *</label>
+              <select id="f_desktopProcBrand">
+                <option value="">Select</option>
+                <option value="Intel">Intel</option>
+                <option value="AMD">AMD</option>
+                <option value="Apple">Apple</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Processor Model *</label>
+              <input type="text" id="f_desktopProcModel" placeholder="e.g. Core i7-14700K / Ryzen 7 7800X3D">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>RAM Size *</label>
+              <select id="f_desktopRamSize">
+                <option value="">Select</option>
+                <option value="8GB">8GB</option>
+                <option value="16GB">16GB</option>
+                <option value="32GB">32GB</option>
+                <option value="64GB">64GB</option>
+                <option value="128GB">128GB</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>RAM Type *</label>
+              <select id="f_desktopRamType">
+                <option value="">Select</option>
+                <option value="DDR4">DDR4</option>
+                <option value="DDR5">DDR5</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Storage Type *</label>
+              <select id="f_desktopStorageType">
+                <option value="">Select</option>
+                <option value="SSD">SSD</option>
+                <option value="HDD">HDD</option>
+                <option value="SSD+HDD">SSD+HDD</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Storage Capacity *</label>
+              <select id="f_desktopStorageCap">
+                <option value="">Select</option>
+                <option value="256GB">256GB</option>
+                <option value="512GB">512GB</option>
+                <option value="1TB">1TB</option>
+                <option value="2TB">2TB</option>
+                <option value="4TB">4TB</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Graphics Card *</label>
+              <input type="text" id="f_desktopGraphics" placeholder="e.g. NVIDIA RTX 4070 12GB">
+            </div>
+            <div class="form-group">
+              <label>Motherboard *</label>
+              <input type="text" id="f_desktopMotherboard" placeholder="e.g. ASUS ROG STRIX B650E-F">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Power Supply *</label>
+              <input type="text" id="f_desktopPsu" placeholder="e.g. 750W 80+ Gold">
+            </div>
+            <div class="form-group">
+              <label>Case / Form Factor *</label>
+              <select id="f_desktopCaseType">
+                <option value="">Select</option>
+                <option value="Mid Tower">Mid Tower</option>
+                <option value="Full Tower">Full Tower</option>
+                <option value="Mini Tower">Mini Tower</option>
+                <option value="Mini-ITX">Mini-ITX</option>
+                <option value="SFF">Small Form Factor (SFF)</option>
+                <option value="All-in-One">All-in-One</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Cooling *</label>
+              <input type="text" id="f_desktopCooling" placeholder="e.g. 240mm AIO / Air Cooler">
+            </div>
+            <div class="form-group">
+              <label>Operating System *</label>
+              <input type="text" id="f_desktopOs" placeholder="e.g. Windows 11 Pro">
+            </div>
+          </div>
+          </div>
+
+
 
           <div class="form-row">
             <div class="form-group">
@@ -259,9 +398,29 @@
               <label>Stock Quantity *</label>
               <input type="number" id="f_stock" placeholder="e.g. 10" required min="0">
             </div>
-            <div class="form-group">
-              <label>Image URL *</label>
-              <input type="url" id="f_image" placeholder="https://example.com/image.jpg" required>
+            <div class="form-group image-upload-intro">
+              <label>Product Images (optional)</label>
+              <p>Upload 1, 2, or all 3 images. JPG, PNG, or WebP only; max 5 MB each.</p>
+            </div>
+          </div>
+
+          <div id="currentImagesPanel" class="current-images-panel" style="display:none;"></div>
+
+          <div class="image-upload-grid">
+            <div class="image-upload-slot">
+              <label>Image 1</label>
+              <input type="file" id="f_image1" accept="image/jpeg,image/png,image/webp">
+              <label class="image-remove-option"><input type="checkbox" id="f_remove1"> Remove existing image 1</label>
+            </div>
+            <div class="image-upload-slot">
+              <label>Image 2</label>
+              <input type="file" id="f_image2" accept="image/jpeg,image/png,image/webp">
+              <label class="image-remove-option"><input type="checkbox" id="f_remove2"> Remove existing image 2</label>
+            </div>
+            <div class="image-upload-slot">
+              <label>Image 3</label>
+              <input type="file" id="f_image3" accept="image/jpeg,image/png,image/webp">
+              <label class="image-remove-option"><input type="checkbox" id="f_remove3"> Remove existing image 3</label>
             </div>
           </div>
 
@@ -272,7 +431,7 @@
 
           <input type="hidden" id="f_editId" value="">
           <button type="submit" class="btn btn-primary btn-block" style="padding:14px;" id="submitBtn">
-            Add Laptop
+            Add Product
           </button>
         </form>
       </div>
@@ -282,10 +441,7 @@
       <div class="table-wrap">
         <table class="admin-table">
           <thead>
-            <tr>
-              <th>Image</th><th>Brand</th><th>Model</th><th>Specs</th>
-              <th>Price</th><th>Stock</th><th>Actions</th>
-            </tr>
+            <tr><th>Image</th><th>Category</th><th>Brand</th><th>Product</th><th>Key Info</th><th>Price</th><th>Stock</th><th>Actions</th></tr>
           </thead>
           <tbody id="laptopTableBody"></tbody>
         </table>
@@ -301,10 +457,7 @@
               <th>Items</th><th>Total</th><th>Payment</th><th>Status</th><th>Action</th>
             </tr>
           </thead>
-          <tbody id="ordersTableBody">
-            <th>Order ID</th><th>Customer</th><th>Contact</th>
-            <th>Items</th><th>Total</th><th>Payment</th><th>Status</th><th>Action</th>
-          </tbody>
+          <tbody id="ordersTableBody"></tbody>
         </table>
       </div>
     </div>
@@ -322,7 +475,7 @@
       <input type="password" id="cp_current">
     </div>
     <div class="form-group">
-      <label>New Password (min 6 characters)</label>
+      <label>New Password (min 8 characters)</label>
       <input type="password" id="cp_new">
     </div>
     <div class="form-group">
@@ -334,7 +487,7 @@
   </div>
 </div>
   
-<script src="js/data.js"></script>
-<script src="js/admin.js"></script>
+<script src="js/data.js?v=10"></script>
+<script src="js/admin.js?v=9"></script>
 </body>
 </html>
