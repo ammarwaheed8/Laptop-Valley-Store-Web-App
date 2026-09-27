@@ -45,6 +45,7 @@ function requireCsrfToken($input) {
 }
 
 header('Content-Type: application/json');
+header('X-Robots-Tag: noindex, nofollow, noarchive');
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit;
@@ -105,6 +106,16 @@ $pdo->exec("
         ip_key TEXT PRIMARY KEY,
         failed_attempts INTEGER DEFAULT 0,
         locked_until INTEGER DEFAULT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS testimonials (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        message TEXT NOT NULL,
+        rating INTEGER NOT NULL,
+        status TEXT NOT NULL DEFAULT 'pending',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
     );
 ");
 
@@ -370,7 +381,7 @@ function validateOrderInput($input) {
     }
 
     $pin = trim($input['pin'] ?? '');
-    if (!preg_match('/^[A-Za-z0-9\-\s]{2,12}$/', $pin)) {
+    if ($pin !== '' && !preg_match('/^[A-Za-z0-9\-\s]{2,12}$/', $pin)) {
         $errors[] = 'PIN/postal code';
     }
 
@@ -460,6 +471,105 @@ switch ($action) {
             $lp['image'] = $lp['images'][0] ?? '';
         }
         echo json_encode(['success' => true, 'laptops' => $laptops]);
+        break;
+
+    // ---- PUBLIC: Get approved testimonials ----
+    case 'get_testimonials':
+        $stmt = $pdo->query("SELECT id, name, message, rating, created_at FROM testimonials WHERE status = 'approved' ORDER BY created_at DESC LIMIT 24");
+        $testimonials = $stmt->fetchAll();
+        foreach ($testimonials as &$testimonial) {
+            $testimonial['id'] = (int)$testimonial['id'];
+            $testimonial['rating'] = (int)$testimonial['rating'];
+        }
+        echo json_encode(['success' => true, 'testimonials' => $testimonials]);
+        break;
+
+    // ---- PUBLIC: Submit testimonial for admin review ----
+    case 'submit_testimonial':
+        requireCsrfToken($input);
+        if (!checkRateLimit($pdo, 'testimonial_' . getClientIp(), 5, 3600)) {
+            http_response_code(429);
+            echo json_encode(['success' => false, 'error' => 'Too many testimonials submitted from this network. Please try again later.']);
+            break;
+        }
+        $name = trim($input['name'] ?? '');
+        $message = trim($input['message'] ?? '');
+        $rating = filter_var($input['rating'] ?? null, FILTER_VALIDATE_INT);
+        if ($name === '' || mb_strlen($name) > 80) {
+            echo json_encode(['success' => false, 'error' => 'Please enter a valid name (maximum 80 characters).']);
+            break;
+        }
+        if ($message === '' || mb_strlen($message) < 5 || mb_strlen($message) > 800) {
+            echo json_encode(['success' => false, 'error' => 'Please enter a message between 5 and 800 characters.']);
+            break;
+        }
+        if ($rating === false || $rating < 1 || $rating > 5) {
+            echo json_encode(['success' => false, 'error' => 'Please choose a rating from 1 to 5 stars.']);
+            break;
+        }
+        $now = date('c');
+        $stmt = $pdo->prepare("INSERT INTO testimonials (name, message, rating, status, created_at, updated_at) VALUES (?, ?, ?, 'pending', ?, ?)");
+        $stmt->execute([$name, $message, $rating, $now, $now]);
+        echo json_encode(['success' => true, 'message' => 'Thank you! Your testimonial has been submitted for review.']);
+        break;
+
+    // ---- PROTECTED: Get all testimonials (admin only) ----
+    case 'get_testimonials_admin':
+        requireAdmin();
+        $stmt = $pdo->query("SELECT * FROM testimonials ORDER BY created_at DESC");
+        $testimonials = $stmt->fetchAll();
+        foreach ($testimonials as &$testimonial) {
+            $testimonial['id'] = (int)$testimonial['id'];
+            $testimonial['rating'] = (int)$testimonial['rating'];
+        }
+        echo json_encode(['success' => true, 'testimonials' => $testimonials]);
+        break;
+
+    // ---- PROTECTED: Add/edit testimonial (admin only) ----
+    case 'save_testimonial':
+        requireAdmin();
+        requireCsrfToken($input);
+        $id = isset($input['id']) && $input['id'] !== '' ? (int)$input['id'] : 0;
+        $name = trim($input['name'] ?? '');
+        $message = trim($input['message'] ?? '');
+        $rating = filter_var($input['rating'] ?? null, FILTER_VALIDATE_INT);
+        $status = trim($input['status'] ?? 'approved');
+        if ($name === '' || mb_strlen($name) > 80) {
+            echo json_encode(['success' => false, 'error' => 'Name is required and must be 80 characters or less.']);
+            break;
+        }
+        if ($message === '' || mb_strlen($message) > 800) {
+            echo json_encode(['success' => false, 'error' => 'Message is required and must be 800 characters or less.']);
+            break;
+        }
+        if ($rating === false || $rating < 1 || $rating > 5) {
+            echo json_encode(['success' => false, 'error' => 'Rating must be between 1 and 5.']);
+            break;
+        }
+        if (!in_array($status, ['pending', 'approved'], true)) {
+            echo json_encode(['success' => false, 'error' => 'Invalid testimonial status.']);
+            break;
+        }
+        $now = date('c');
+        if ($id > 0) {
+            $stmt = $pdo->prepare("UPDATE testimonials SET name = ?, message = ?, rating = ?, status = ?, updated_at = ? WHERE id = ?");
+            $stmt->execute([$name, $message, $rating, $status, $now, $id]);
+            echo json_encode(['success' => true, 'id' => $id]);
+        } else {
+            $stmt = $pdo->prepare("INSERT INTO testimonials (name, message, rating, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)");
+            $stmt->execute([$name, $message, $rating, $status, $now, $now]);
+            echo json_encode(['success' => true, 'id' => (int)$pdo->lastInsertId()]);
+        }
+        break;
+
+    // ---- PROTECTED: Delete testimonial (admin only) ----
+    case 'delete_testimonial':
+        requireAdmin();
+        requireCsrfToken($input);
+        $id = (int)($input['id'] ?? 0);
+        $stmt = $pdo->prepare("DELETE FROM testimonials WHERE id = ?");
+        $stmt->execute([$id]);
+        echo json_encode(['success' => true]);
         break;
 
     // ---- PUBLIC: Place an order (any buyer can order) ----
