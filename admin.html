@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Admin Panel - Laptop Valley</title>
-<link rel="stylesheet" href="css/style.css?v=10">
+<link rel="stylesheet" href="css/style.css?v=13">
 <link rel="shortcut icon" href="assets/favicon.png" type="image/x-icon">
 </head>
 <body class="admin-body">
@@ -70,6 +70,7 @@
       <button type="button" class="tab-btn active" data-tab="add">Add Product</button>
       <button type="button" class="tab-btn" data-tab="manage">Manage Products</button>
       <button type="button" class="tab-btn" data-tab="orders">Orders</button>
+      <button type="button" class="tab-btn" data-tab="testimonials">Testimonials <span id="testimonialPendingCount" class="pending-tab-count" aria-label="Pending testimonials">0</span></button>
     </div>
 
     <div id="tab-add" class="tab-content active">
@@ -381,10 +382,10 @@
               <select id="f_warranty" required>
                 <option value="">Select</option>
                 <option value="No Warranty">No Warranty</option>
-                <option value="6 Months">6 Months</option>
-                <option value="1 Year">1 Year</option>
-                <option value="2 Years">2 Years</option>
-                <option value="3 Years">3 Years</option>
+                <option value="3 Days">3 Days</option>
+                <option value="7 Days">7 Days</option>
+                <option value="15 Days">15 Days</option>
+                <option value="30 Days">30 Days</option>
               </select>
             </div>
             <div class="form-group">
@@ -448,6 +449,26 @@
       </div>
     </div>
 
+    <div id="tab-testimonials" class="tab-content">
+      <div class="card testimonial-admin-card">
+        <h2 style="color:#1e40af; margin-bottom:8px;">Manage Testimonials</h2>
+        <p style="color:#64748b; margin-bottom:20px;">Public submissions appear here as Pending / Hidden. Use Approve to publish them on the website, Hide to remove them from the public board, or Edit/Delete to manage them.</p>
+        <form id="testimonialAdminForm">
+          <div class="form-row">
+            <div class="form-group"><label>Name *</label><input type="text" id="adminTestimonialName" maxlength="80" required placeholder="Customer name"></div>
+            <div class="form-group"><label>Rating *</label><select id="adminTestimonialRating" required><option value="5">★★★★★ 5 / 5</option><option value="4">★★★★☆ 4 / 5</option><option value="3">★★★☆☆ 3 / 5</option><option value="2">★★☆☆☆ 2 / 5</option><option value="1">★☆☆☆☆ 1 / 5</option></select></div>
+          </div>
+          <div class="form-group"><label>Message *</label><textarea id="adminTestimonialMessage" rows="4" maxlength="800" required placeholder="Customer testimonial"></textarea></div>
+          <div class="form-row">
+            <div class="form-group"><label>Status</label><select id="adminTestimonialStatus"><option value="approved">Approved / Visible</option><option value="pending">Pending / Hidden</option></select></div>
+            <div class="form-group" style="display:flex; align-items:flex-end; gap:10px;"><button type="submit" class="btn btn-primary" id="adminTestimonialSubmit">Add Testimonial</button><button type="button" class="btn btn-outline" id="adminTestimonialCancel" style="display:none;">Cancel Edit</button></div>
+          </div>
+          <input type="hidden" id="adminTestimonialEditId" value="">
+        </form>
+      </div>
+      <div class="table-wrap testimonial-admin-table-wrap"><table class="admin-table"><thead><tr><th>Name</th><th>Message</th><th>Rating</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead><tbody id="testimonialsTableBody"><tr><td colspan="6" style="text-align:center; padding:30px;">Loading testimonials...</td></tr></tbody></table></div>
+    </div>
+
     <div id="tab-orders" class="tab-content">
       <div class="table-wrap">
         <table class="admin-table">
@@ -487,7 +508,7 @@
   </div>
 </div>
   
-<script src="js/data.js?v=10"></script>
-<script src="js/admin.js?v=9"></script>
+<script src="js/data.js?v=14"></script>
+<script src="js/admin.js?v=14"></script>
 </body>
 </html>
