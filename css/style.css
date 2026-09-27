@@ -603,7 +603,7 @@ footer p { opacity:0.8; font-size:0.9rem; margin-top:15px; }
 .admin-table tr:hover { background: var(--light-blue); }
 .table-wrap { overflow-x:auto; background:white; border-radius:10px; box-shadow:var(--shadow); }
 
-.action-btns { display:flex; gap:6px; flex-wrap:wrap; }
+.action-btns { display:flex; gap:6px; flex-wrap:wrap; width: 130px;}
 .icon-btn { padding:6px 10px; font-size:0.8rem; }
 
 .badge { padding:3px 10px; border-radius:12px; font-size:0.75rem; font-weight:600; }
@@ -1457,3 +1457,36 @@ textarea {
     width: 86vw;
   }
 }
+
+
+/* =====================================================================
+   TESTIMONIALS / WARRANTY NOTE
+   ===================================================================== */
+.testimonials-section { padding-top: 28px; }
+.testimonials-layout { display:grid; grid-template-columns:minmax(0,1.5fr) minmax(300px,.9fr); gap:22px; align-items:start; }
+.testimonials-list { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }
+.testimonial-card { background:#fff; border-radius:16px; padding:22px; box-shadow:var(--shadow); border:1px solid rgba(59,130,246,.08); min-height:170px; display:flex; flex-direction:column; }
+.testimonial-message { color:#334155; line-height:1.7; font-size:.95rem; margin:0 0 18px; white-space:pre-wrap; overflow-wrap:anywhere; }
+.testimonial-name { color:#1e293b; font-weight:800; margin-top:auto; }
+.testimonial-stars { color:#f59e0b; letter-spacing:2px; font-size:1.05rem; margin-top:7px; }
+.testimonials-empty { color:var(--gray); text-align:center; padding:32px 20px; grid-column:1/-1; }
+.testimonials-empty.card { box-shadow:var(--shadow); }
+.testimonial-form-card h3 { color:var(--primary-blue); margin-bottom:7px; }
+.testimonial-form-intro { color:var(--gray); font-size:.86rem; margin-bottom:18px; }
+.rating-fieldset { border:0; padding:0; margin:0 0 18px; }
+.rating-fieldset legend { display:block; font-size:.85rem; font-weight:700; color:#334155; margin-bottom:8px; }
+.star-rating-input { display:flex; flex-direction:row; justify-content:flex-start; gap:4px; }
+.star-rating-input input { position:absolute; opacity:0; pointer-events:none; }
+.star-rating-input span { font-size:2rem; line-height:1; color:#cbd5e1; cursor:pointer; transition:.15s; }
+.star-rating-input label:hover span,.star-rating-input label.selected span { color:#f59e0b; }
+.testimonial-form-message { margin-top:12px; font-size:.86rem; font-weight:700; }
+.testimonial-form-message.success { color:#15803d; }
+.testimonial-form-message.error { color:#dc2626; }
+.admin-stars { color:#f59e0b; letter-spacing:1px; white-space:nowrap; }
+.testimonial-admin-table-wrap { margin-top:20px; }
+.testimonial-admin-card textarea { min-height:120px; }
+.product-warranty-note { margin:18px 0 0; padding:12px 14px; border-left:4px solid #dc2626; background:#fff7ed; color:#991b1b; font-size:.88rem; line-height:1.5; border-radius:8px; }
+@media (max-width:900px){.testimonials-layout{grid-template-columns:1fr}.testimonials-list{grid-template-columns:1fr 1fr}}
+@media (max-width:600px){.testimonials-list{grid-template-columns:1fr}.testimonial-card{padding:18px}.star-rating-input span{font-size:1.8rem}}
+
+.pending-tab-count { display:inline-flex; align-items:center; justify-content:center; min-width:22px; height:22px; padding:0 6px; margin-left:5px; border-radius:999px; background:#f59e0b; color:#fff; font-size:.72rem; font-weight:800; line-height:1; vertical-align:middle; }
