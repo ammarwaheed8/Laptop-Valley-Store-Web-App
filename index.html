@@ -35,34 +35,39 @@
 
 <!-- Google site name + organization identity structured data.
      Use only accurate brand aliases and verified public profiles. -->
+<!-- Website identity: helps Google understand the preferred site name.
+     This markup does not itself guarantee a rich-result feature. -->
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
-  "@graph": [
-    {
-      "@type": "WebSite",
-      "@id": "https://microthinkers.vercel.app/#website",
-      "url": "https://microthinkers.vercel.app/",
-      "name": "MicroThinkers",
-      "alternateName": "Micro Thinkers",
-      "inLanguage": "en"
-    },
-    {
-      "@type": "Organization",
-      "@id": "https://microthinkers.vercel.app/#organization",
-      "name": "MicroThinkers",
-      "alternateName": "Micro Thinkers",
-      "url": "https://microthinkers.vercel.app/",
-      "logo": {
-        "@type": "ImageObject",
-        "url": "https://microthinkers.vercel.app/assets/logo.png"
-      },
-      "description": "MicroThinkers provides web development, AI/ML solutions, UI/UX design, DevOps, and digital marketing services.",
-      "sameAs": [
-        "https://www.linkedin.com/company/microthinkers/",
-        "https://www.instagram.com/micro_thinkers"
-      ]
-    }
+  "@type": "WebSite",
+  "@id": "https://microthinkers.vercel.app/#website",
+  "url": "https://microthinkers.vercel.app/",
+  "name": "MicroThinkers",
+  "alternateName": "Micro Thinkers",
+  "inLanguage": "en"
+}
+</script>
+
+<!-- Organization identity: use only official, accurate public details.
+     Verify the logo URL and social profile URLs before deployment. -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "@id": "https://microthinkers.vercel.app/#organization",
+  "name": "MicroThinkers",
+  "alternateName": "Micro Thinkers",
+  "url": "https://microthinkers.vercel.app/",
+  "logo": {
+    "@type": "ImageObject",
+    "url": "https://microthinkers.vercel.app/assets/logo.png"
+  },
+  "description": "MicroThinkers provides web development, AI/ML solutions, UI/UX design, DevOps, and digital marketing services.",
+  "email": "hello@microthinkers.com",
+  "sameAs": [
+    "https://www.linkedin.com/company/microthinkers/",
+    "https://www.instagram.com/micro_thinkers"
   ]
 }
 </script>
